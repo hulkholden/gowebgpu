@@ -1,0 +1,28 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  align-items: center;
+  background: #D6E9FF;
+  font-family: Raleway, Helvetica, sans-serif;
+  font-size: 100%;
+  color: #0244A1;
+}
+
+h1 {
+  font-size: 4em;
+  font-weight: 100;
+  color: #0244A1;
+  margin: 0.4em;
+}
+
+p {
+  font-size: 1.5em;
+}
+
+/*# sourceMappingURL=style.css.map */

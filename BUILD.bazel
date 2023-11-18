@@ -1,0 +1,60 @@
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
+# gazelle:prefix github.com/hulkholden/gowebgpu
+gazelle(name = "gazelle")
+
+gazelle(
+    name = "gazelle-update-repos",
+    args = [
+        "-from_file=go.mod",
+        "-prune",
+    ],
+    command = "update-repos",
+)
+
+oci_tarball(
+    name = "gowebgpu_tarball",
+    image = ":image",
+    repo_tags = ["gowebgpu:latest"],
+)
+
+oci_image(
+    name = "image",
+    base = "@distroless_static",
+    entrypoint = ["/gowebgpu_linux"],
+    tars = [":gowebgpu_layer"],
+)
+
+pkg_tar(
+    name = "gowebgpu_layer",
+    srcs = [":gowebgpu_linux"],
+    # include_runfiles = True
+)
+
+go_binary(
+    name = "gowebgpu_linux",
+    embed = [":gowebgpu_lib"],
+    goarch = "amd64",
+    goos = "linux",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "gowebgpu",
+    embed = [":gowebgpu_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "gowebgpu_lib",
+    srcs = ["main.go"],
+    embedsrcs = ["templates/index.html"],
+    importpath = "github.com/hulkholden/gowebgpu",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//static",
+    ],
+)

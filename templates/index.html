@@ -1,0 +1,21 @@
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <script src="static/wasm_exec.js"></script>
+    <script>
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("static/client.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+        });
+    </script>
+    <link rel="stylesheet" href="static/style.css">
+    <script type="module" src="static/code.js"></script>
+</head>
+
+<body>
+    <h1>Go / WASM / WebGPU Demo</h1>
+    <a href="https://github.com/hulkholden/gowebgpu"><img src="static/github-mark.svg" width="20" height="20" class="d-block" loading="lazy" decoding="async" alt="GitHub mark"></a>
+</body>
+
+</html>
