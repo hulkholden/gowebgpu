@@ -1,3 +1,5 @@
+"""gowebgpu module"""
+
 module(
     name = "gowebgpu",
     version = "0.0.1",
@@ -11,6 +13,7 @@ bazel_dep(name = "gazelle", version = "0.34.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
+use_repo(go_deps, "com_github_mokiat_gog", "com_github_mokiat_wasmgpu")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
