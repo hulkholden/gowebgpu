@@ -54,7 +54,5 @@ go_library(
     embedsrcs = ["templates/index.html"],
     importpath = "github.com/hulkholden/gowebgpu",
     visibility = ["//visibility:private"],
-    deps = [
-        "//static",
-    ],
+    deps = ["//static"],
 )
