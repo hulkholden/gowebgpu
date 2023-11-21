@@ -1,11 +1,10 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math"
+	"math/rand"
 	"net/http"
 	"syscall/js"
 	"time"
@@ -14,7 +13,9 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
-const bufferSize = 1024
+const (
+	numParticles = 3000
+)
 
 func exportSolve() {
 	fn := js.FuncOf(func(this js.Value, args []js.Value) any {
@@ -32,55 +33,58 @@ func exportSolve() {
 	js.Global().Get("window").Set("solve", fn)
 }
 
-var vertices = []float32{
-	0.0, 0.6, 0, 1, 1, 0, 0, 1, -0.5, -0.6, 0, 1, 0, 1, 0, 1, 0.5, -0.6, 0, 1, 0,
-	0, 1, 1,
-}
-
-func runRender(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
-	shaderBytes, err := loadFile("/static/shaders/render.wgsl")
+// https://webgpu.github.io/webgpu-samples/samples/computeBoids
+func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
+	spriteShaderBytes, err := loadFile("/static/shaders/render.wgsl")
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
-	shaderModule := device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-		Code: string(shaderBytes),
+
+	spriteShaderModule := device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
+		Code: string(spriteShaderBytes),
 	})
 
-	vertexBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(vertices) * 4),
-		Usage: wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsCopyDst,
-	})
-
-	device.Queue().WriteBuffer(vertexBuffer, 0, asByteSlice(vertices))
-
-	vertexBuffers := []wasmgpu.GPUVertexBufferLayout{
-		{
-			Attributes: []wasmgpu.GPUVertexAttribute{
-				{
-					ShaderLocation: 0, // position
-					Offset:         0,
-					Format:         wasmgpu.GPUVertexFormatFloat32x4,
-				},
-				{
-					ShaderLocation: 1, // color
-					Offset:         16,
-					Format:         wasmgpu.GPUVertexFormatFloat32x4,
-				},
-			},
-			ArrayStride: 32,
-			StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
-		},
-	}
-
-	pipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
+	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
 		// Layout: "auto",
 		Vertex: wasmgpu.GPUVertexState{
-			Module:     shaderModule,
+			Module:     spriteShaderModule,
 			EntryPoint: "vertex_main",
-			Buffers:    vertexBuffers,
+			Buffers: []wasmgpu.GPUVertexBufferLayout{
+				{
+					// instanced particles buffer
+					ArrayStride: 4 * 4,
+					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
+					Attributes: []wasmgpu.GPUVertexAttribute{
+						{
+							// position
+							ShaderLocation: 0,
+							Offset:         0,
+							Format:         wasmgpu.GPUVertexFormatFloat32x2,
+						},
+						{
+							// velocity
+							ShaderLocation: 1,
+							Offset:         2 * 4,
+							Format:         wasmgpu.GPUVertexFormatFloat32x2,
+						},
+					},
+				},
+				{
+					// vertex buffer
+					ArrayStride: 2 * 4,
+					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
+					Attributes: []wasmgpu.GPUVertexAttribute{
+						{
+							ShaderLocation: 2, // position
+							Offset:         0,
+							Format:         wasmgpu.GPUVertexFormatFloat32x2,
+						},
+					},
+				},
+			},
 		},
 		Fragment: opt.V(wasmgpu.GPUFragmentState{
-			Module:     shaderModule,
+			Module:     spriteShaderModule,
 			EntryPoint: "fragment_main",
 			Targets: []wasmgpu.GPUColorTargetState{
 				{
@@ -93,84 +97,20 @@ func runRender(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error
 			Topology: opt.V(wasmgpu.GPUPrimitiveTopologyTriangleList),
 		}),
 	}
-	renderPipeline := device.CreateRenderPipeline(pipelineDescriptor)
+	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
-	commandEncoder := device.CreateCommandEncoder()
-
-	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
-		ColorAttachments: []wasmgpu.GPURenderPassColorAttachment{
-			{
-				View: context.GetCurrentTexture().CreateView(),
-				ClearValue: opt.V(wasmgpu.GPUColor{
-					R: 0.0,
-					G: 0.5,
-					B: 1.0,
-					A: 1.0,
-				}),
-				LoadOp:  wasmgpu.GPULoadOpClear,
-				StoreOp: wasmgpu.GPUStoreOPStore,
-			},
-		},
-	}
-
-	renderPass := commandEncoder.BeginRenderPass(renderPassDescriptor)
-	renderPass.SetPipeline(renderPipeline)
-	renderPass.SetVertexBuffer(0, vertexBuffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
-	renderPass.Draw(3, opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
-	renderPass.End()
-
-	device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
-		commandEncoder.Finish(),
-	})
-	return nil
-}
-
-func runCompute(device wasmgpu.GPUDevice) error {
-	shaderBytes, err := loadFile("/static/shaders/compute.wgsl")
+	// Compute
+	updateSpritesShaderBytes, err := loadFile("/static/shaders/compute.wgsl")
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
 
-	shaderModule := device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-		Code: string(shaderBytes),
-	})
-
-	output := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  bufferSize,
-		Usage: wasmgpu.GPUBufferUsageFlagsStorage | wasmgpu.GPUBufferUsageFlagsCopySrc,
-	})
-	stagingBuffer := device.CreateBuffer((wasmgpu.GPUBufferDescriptor{
-		Size:  bufferSize,
-		Usage: wasmgpu.GPUBufferUsageFlagsMapRead | wasmgpu.GPUBufferUsageFlagsCopyDst,
-	}))
-	bindGroupLayout := device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
-		Entries: []wasmgpu.GPUBindGroupLayoutEntry{
-			{
-				Binding:    0,
-				Visibility: wasmgpu.GPUShaderStageFlagsCompute,
-				Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
-					Type: opt.V(wasmgpu.GPUBufferBindingTypeStorage),
-				}),
-			},
-		},
-	})
-	bindGroup := device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
-		Layout: bindGroupLayout,
-		Entries: []wasmgpu.GPUBindGroupEntry{
-			{
-				Binding: 0,
-				Resource: wasmgpu.GPUBufferBinding{
-					Buffer: output,
-				},
-			},
-		},
-	})
-	pipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
-		Layout: opt.V(device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
-			BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{bindGroupLayout},
-		})),
+	computePipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
+		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
-			Module:     shaderModule,
+			Module: device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
+				Code: string(updateSpritesShaderBytes),
+			}),
 			EntryPoint: "main",
 			// Doesn't seem to work: https://bugs.chromium.org/p/dawn/issues/detail?id=2255
 			// Constants: opt.V(wasmgpu.GPUProgrammableStageConstants{
@@ -178,49 +118,180 @@ func runCompute(device wasmgpu.GPUDevice) error {
 			// }),
 		},
 	}
-	computePipeline := device.CreateComputePipeline(pipelineDescriptor)
-	passDescriptor := wasmgpu.GPUComputePassDescriptor{}
-	commandEncoder := device.CreateCommandEncoder()
-	passEncoder := commandEncoder.BeginComputePass(opt.V(passDescriptor))
-	passEncoder.SetPipeline(computePipeline)
-	passEncoder.SetBindGroup(0, bindGroup, nil)
-	numFloats := bufferSize / 4
-	numWorkgroups := (numFloats + 63) / 64
-	passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(numWorkgroups), 0, 0)
-	passEncoder.End()
+	computePipeline := device.CreateComputePipeline(computePipelineDescriptor)
 
-	commandEncoder.CopyBufferToBuffer(output, 0, stagingBuffer, 0, bufferSize)
-
-	device.Queue().Submit([]wasmgpu.GPUCommandBuffer{commandEncoder.Finish()})
-
-	fmt.Printf("Calling MapAsync\n")
-	promise := stagingBuffer.MapAsync(wasmgpu.GPUMapModeFlagsRead, 0, bufferSize)
-	wait := make(chan any)
-	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
-		fmt.Printf("got an arg: %v\n", args[0])
-		wait <- nil
-		return nil
-	}))
-	<-wait
-	fmt.Printf("MapAsync returned\n")
-
-	ab := stagingBuffer.GetMappedRange(0, bufferSize)
-	abCopy := ab.Call("slice")
-	stagingBuffer.Unmap()
-
-	u8 := js.Global().Get("Uint8Array").New(abCopy)
-	bytes := make([]byte, 1024)
-	numBytes := js.CopyBytesToGo(bytes, u8)
-	fmt.Printf("Go got: %v, %v\n", bytes, numBytes)
-
-	for i := 0; i+3 < len(bytes); i += 4 {
-		bits := binary.LittleEndian.Uint32(bytes[i : i+4])
-		f := math.Float32frombits(bits)
-		fmt.Printf("%d: %f\n", i/4, f)
+	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
+		ColorAttachments: []wasmgpu.GPURenderPassColorAttachment{
+			{
+				View:       context.GetCurrentTexture().CreateView(),
+				ClearValue: opt.V(wasmgpu.GPUColor{R: 0.0, G: 0.0, B: 0.0, A: 1.0}),
+				LoadOp:     wasmgpu.GPULoadOpClear,
+				StoreOp:    wasmgpu.GPUStoreOPStore,
+			},
+		},
 	}
 
+	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
+
+	vertexBufferData := []float32{
+		-0.01, -0.02, 0.01,
+		-0.02, 0.0, 0.02,
+	}
+
+	spriteVertexBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
+		Size:  wasmgpu.GPUSize64(len(vertexBufferData) * 4),
+		Usage: wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsCopyDst,
+		// mappedAtCreation: true,
+	})
+	device.Queue().WriteBuffer(spriteVertexBuffer, 0, asByteSlice(vertexBufferData))
+	// TODO: mappedAtCreation, drop CopyDst.
+	// new Float32Array(spriteVertexBuffer.getMappedRange()).set(vertexBufferData);
+	// spriteVertexBuffer.unmap();
+
+	simParams := []float32{
+		0.04,  // deltaT
+		0.1,   // rule1Distance
+		0.025, // rule2Distance
+		0.025, // rule3Distance
+		0.02,  // rule1Scale
+		0.05,  // rule2Scale
+		0.005, // rule3Scale
+	}
+	simParamBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
+		Size:  wasmgpu.GPUSize64(len(simParams) * 4),
+		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
+	})
+
+	updateSimParams := func() {
+		device.Queue().WriteBuffer(simParamBuffer, 0, asByteSlice(simParams))
+	}
+	updateSimParams()
+
+	// TODO: add sim params to GUI.
+
+	initialParticleData := make([]float32, numParticles*4)
+	for i := 0; i < numParticles; i++ {
+		initialParticleData[i*4+0] = 0.01 + 2*(rand.Float32()-0.5)
+		initialParticleData[i*4+1] = 0.01 + 2*(rand.Float32()-0.5)
+		initialParticleData[i*4+2] = 0.01 + 2*(rand.Float32()-0.5)*0.1
+		initialParticleData[i*4+3] = 0.01 + 2*(rand.Float32()-0.5)*0.1
+	}
+
+	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
+	for i := 0; i < 2; i++ {
+		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
+			Size:  wasmgpu.GPUSize64(len(initialParticleData) * 4),
+			Usage: wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage | wasmgpu.GPUBufferUsageFlagsCopyDst,
+		})
+		// TODO: mappedAtCreation
+		device.Queue().WriteBuffer(particleBuffers[i], 0, asByteSlice(initialParticleData))
+	}
+
+	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
+	for i := 0; i < 2; i++ {
+		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
+			Layout: computePipeline.GetBindGroupLayout(0),
+			Entries: []wasmgpu.GPUBindGroupEntry{
+				{
+					Binding: 0,
+					Resource: wasmgpu.GPUBufferBinding{
+						Buffer: simParamBuffer,
+					},
+				},
+				{
+					Binding: 1,
+					Resource: wasmgpu.GPUBufferBinding{
+						Buffer: particleBuffers[i],
+						// Are these needed or defaults?
+						Offset: opt.V(wasmgpu.GPUSize64(0)),
+						Size:   opt.V(wasmgpu.GPUSize64(len(initialParticleData) * 4)),
+					},
+				},
+				{
+					Binding: 2,
+					Resource: wasmgpu.GPUBufferBinding{
+						Buffer: particleBuffers[(i+1)%2],
+						// Are these needed or defaults?
+						Offset: opt.V(wasmgpu.GPUSize64(0)),
+						Size:   opt.V(wasmgpu.GPUSize64(len(initialParticleData) * 4)),
+					},
+				},
+			},
+		})
+	}
+
+	r := renderer{
+		device:                device,
+		context:               context,
+		computePassDescriptor: computePassDescriptor,
+		computePipeline:       computePipeline,
+		renderPassDescriptor:  renderPassDescriptor,
+		renderPipeline:        renderPipeline,
+
+		particleBindGroups: particleBindGroups,
+		particleBuffers:    particleBuffers,
+		spriteVertexBuffer: spriteVertexBuffer,
+	}
+	r.initRenderCallback()
 	return nil
 }
+
+type renderer struct {
+	t int
+
+	device  wasmgpu.GPUDevice
+	context wasmgpu.GPUCanvasContext
+
+	computePassDescriptor wasmgpu.GPUComputePassDescriptor
+	computePipeline       wasmgpu.GPUComputePipeline
+
+	renderPassDescriptor wasmgpu.GPURenderPassDescriptor
+	renderPipeline       wasmgpu.GPURenderPipeline
+
+	particleBindGroups []wasmgpu.GPUBindGroup
+	particleBuffers    []wasmgpu.GPUBuffer
+	spriteVertexBuffer wasmgpu.GPUBuffer
+}
+
+func (r *renderer) initRenderCallback() {
+	frame := js.FuncOf(func(this js.Value, args []js.Value) any {
+		r.renderPassDescriptor.ColorAttachments[0].View = r.context.GetCurrentTexture().CreateView()
+
+		commandEncoder := r.device.CreateCommandEncoder()
+
+		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(r.computePassDescriptor))
+			passEncoder.SetPipeline(r.computePipeline)
+			passEncoder.SetBindGroup(0, r.particleBindGroups[r.t%2], nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
+			passEncoder.End()
+		}
+		{
+			passEncoder := commandEncoder.BeginRenderPass(r.renderPassDescriptor)
+			passEncoder.SetPipeline(r.renderPipeline)
+			passEncoder.SetVertexBuffer(0, r.particleBuffers[(r.t+1)%2], opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.SetVertexBuffer(1, r.spriteVertexBuffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
+			passEncoder.End()
+		}
+
+		r.device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
+			commandEncoder.Finish(),
+		})
+
+		r.t++
+		r.initRenderCallback()
+		return nil
+	})
+	Window().RequestAnimationFrame(frame)
+}
+
+type HTMLWindow struct{ jsValue js.Value }
+
+func Window() HTMLWindow {
+	return HTMLWindow{js.Global().Get("window")}
+}
+func (w HTMLWindow) RequestAnimationFrame(fn js.Func) { w.jsValue.Call("requestAnimationFrame", fn) }
 
 func loadFile(url string) ([]byte, error) {
 	res, err := http.DefaultClient.Get(url)
@@ -262,12 +333,8 @@ func main() {
 	context := wasmgpu.NewCanvasContext(jsContext)
 	device := wasmgpu.NewDevice(jsDevice)
 
-	if err := runRender(device, context); err != nil {
+	if err := runComputeBoids(device, context); err != nil {
 		log.Printf("runRender() failed: %v", err)
-	}
-
-	if err := runCompute(device); err != nil {
-		log.Printf("runCompute() failed: %v", err)
 	}
 
 	exportSolve()
