@@ -1,3 +1,5 @@
+override contant_u32 : u32;
+
 @group(0) @binding(0)
 var<storage, read_write> output: array<f32>;
 

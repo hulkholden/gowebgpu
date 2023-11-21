@@ -165,15 +165,20 @@ func runCompute(device wasmgpu.GPUDevice) error {
 			},
 		},
 	})
-	computePipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
+	pipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
 		Layout: opt.V(device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
 			BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{bindGroupLayout},
 		})),
 		Compute: wasmgpu.GPUProgrammableStage{
 			Module:     shaderModule,
 			EntryPoint: "main",
+			// Doesn't seem to work: https://bugs.chromium.org/p/dawn/issues/detail?id=2255
+			// Constants: opt.V(wasmgpu.GPUProgrammableStageConstants{
+			// 	"contant_u32": 13,
+			// }),
 		},
-	})
+	}
+	computePipeline := device.CreateComputePipeline(pipelineDescriptor)
 	passDescriptor := wasmgpu.GPUComputePassDescriptor{}
 	commandEncoder := device.CreateCommandEncoder()
 	passEncoder := commandEncoder.BeginComputePass(opt.V(passDescriptor))
