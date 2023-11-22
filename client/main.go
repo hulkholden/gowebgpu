@@ -36,18 +36,8 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					ArrayStride: 4 * 4,
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						{
-							// position
-							ShaderLocation: 0,
-							Offset:         0,
-							Format:         wasmgpu.GPUVertexFormatFloat32x2,
-						},
-						{
-							// velocity
-							ShaderLocation: 1,
-							Offset:         2 * 4,
-							Format:         wasmgpu.GPUVertexFormatFloat32x2,
-						},
+						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, 0),   // position
+						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, 2*4), // velocity
 					},
 				},
 				{
@@ -55,11 +45,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					ArrayStride: 2 * 4,
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						{
-							ShaderLocation: 2, // position
-							Offset:         0,
-							Format:         wasmgpu.GPUVertexFormatFloat32x2,
-						},
+						makeGPUVertexAttribute(2, wasmgpu.GPUVertexFormatFloat32x2, 0), // position
 					},
 				},
 			},
