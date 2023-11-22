@@ -19,14 +19,10 @@ const (
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
-	spriteShaderBytes, err := loadFile("/static/shaders/render.wgsl")
+	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl")
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
-
-	spriteShaderModule := device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-		Code: string(spriteShaderBytes),
-	})
 
 	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
 		// Layout: "auto",
@@ -84,7 +80,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
 	// Compute
-	updateSpritesShaderBytes, err := loadFile("/static/shaders/compute.wgsl")
+	updateSpritesShaderModule, err := loadShaderModule(device, "/static/shaders/compute.wgsl")
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
@@ -92,9 +88,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	computePipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
-			Module: device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-				Code: string(updateSpritesShaderBytes),
-			}),
+			Module:     updateSpritesShaderModule,
 			EntryPoint: "main",
 			// Doesn't seem to work: https://bugs.chromium.org/p/dawn/issues/detail?id=2255
 			// Constants: opt.V(wasmgpu.GPUProgrammableStageConstants{
@@ -276,6 +270,17 @@ func Window() HTMLWindow {
 	return HTMLWindow{js.Global().Get("window")}
 }
 func (w HTMLWindow) RequestAnimationFrame(fn js.Func) { w.jsValue.Call("requestAnimationFrame", fn) }
+
+func loadShaderModule(device wasmgpu.GPUDevice, url string) (wasmgpu.GPUShaderModule, error) {
+	bytes, err := loadFile(url)
+	if err != nil {
+		return wasmgpu.GPUShaderModule{}, fmt.Errorf("loading shader: %v", err)
+	}
+
+	return device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
+		Code: string(bytes),
+	}), nil
+}
 
 func loadFile(url string) ([]byte, error) {
 	res, err := http.DefaultClient.Get(url)
