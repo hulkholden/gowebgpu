@@ -17,22 +17,6 @@ const (
 	numParticles = 3000
 )
 
-func exportSolve() {
-	fn := js.FuncOf(func(this js.Value, args []js.Value) any {
-		if len(args) < 3 {
-			// Log error?
-			return nil
-		}
-		a0 := args[0].String()
-		a1 := args[1].String()
-		a2 := args[2].String()
-		log.Printf("Solve(%q, %q, %q) = %v", a0, a1, a2)
-		return 0
-	})
-
-	js.Global().Get("window").Set("solve", fn)
-}
-
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	spriteShaderBytes, err := loadFile("/static/shaders/render.wgsl")
@@ -337,6 +321,5 @@ func main() {
 		log.Printf("runRender() failed: %v", err)
 	}
 
-	exportSolve()
 	<-make(chan bool)
 }
