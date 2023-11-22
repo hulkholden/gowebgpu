@@ -118,14 +118,12 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 
 	spriteVertexBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(vertexBufferData) * 4),
-		Usage: wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsCopyDst,
-		// mappedAtCreation: true,
+		Size:             wasmgpu.GPUSize64(len(vertexBufferData) * 4),
+		Usage:            wasmgpu.GPUBufferUsageFlagsVertex,
+		MappedAtCreation: opt.V(true),
 	})
-	device.Queue().WriteBuffer(spriteVertexBuffer, 0, asByteSlice(vertexBufferData))
-	// TODO: mappedAtCreation, drop CopyDst.
-	// new Float32Array(spriteVertexBuffer.getMappedRange()).set(vertexBufferData);
-	// spriteVertexBuffer.unmap();
+	setFloat32Array(float32ArrayCtor.New(spriteVertexBuffer.GetMappedRange(0, 0)), vertexBufferData)
+	spriteVertexBuffer.Unmap()
 
 	simParams := []float32{
 		0.04,  // deltaT
@@ -159,11 +157,12 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
 	for i := 0; i < 2; i++ {
 		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-			Size:  wasmgpu.GPUSize64(len(initialParticleData) * 4),
-			Usage: wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage | wasmgpu.GPUBufferUsageFlagsCopyDst,
+			Size:             wasmgpu.GPUSize64(len(initialParticleData) * 4),
+			Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
+			MappedAtCreation: opt.V(true),
 		})
-		// TODO: mappedAtCreation
-		device.Queue().WriteBuffer(particleBuffers[i], 0, asByteSlice(initialParticleData))
+		setFloat32Array(float32ArrayCtor.New(particleBuffers[i].GetMappedRange(0, 0)), initialParticleData)
+		particleBuffers[i].Unmap()
 	}
 
 	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
@@ -181,18 +180,12 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					Binding: 1,
 					Resource: wasmgpu.GPUBufferBinding{
 						Buffer: particleBuffers[i],
-						// Are these needed or defaults?
-						Offset: opt.V(wasmgpu.GPUSize64(0)),
-						Size:   opt.V(wasmgpu.GPUSize64(len(initialParticleData) * 4)),
 					},
 				},
 				{
 					Binding: 2,
 					Resource: wasmgpu.GPUBufferBinding{
 						Buffer: particleBuffers[(i+1)%2],
-						// Are these needed or defaults?
-						Offset: opt.V(wasmgpu.GPUSize64(0)),
-						Size:   opt.V(wasmgpu.GPUSize64(len(initialParticleData) * 4)),
 					},
 				},
 			},

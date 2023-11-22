@@ -2,7 +2,15 @@ package main
 
 import (
 	"runtime"
+	"syscall/js"
 	"unsafe"
+)
+
+var (
+	objectCtor       = js.Global().Get("Object")
+	arrayBufferCtor  = js.Global().Get("ArrayBuffer")
+	uint8ArrayCtor   = js.Global().Get("Uint8Array")
+	float32ArrayCtor = js.Global().Get("Float32Array")
 )
 
 type numeric interface {
@@ -20,4 +28,12 @@ func asByteSlice[T numeric](data []T) []byte {
 	bytes := unsafe.Slice(bytePtr, byteLen)
 	runtime.KeepAlive(data)
 	return bytes
+}
+
+func setFloat32Array(f32arr js.Value, values []float32) {
+	// Ideally we could all something like: `f32arr.Call("set", vertexBufferData)`
+	// but the js only handles []any.
+	for i := 0; i < len(values); i++ {
+		f32arr.SetIndex(i, values[i])
+	}
 }

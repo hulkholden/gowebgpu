@@ -7,4 +7,4 @@ require (
 	github.com/mokiat/wasmgpu v0.0.0-20230730193614-46ebe799070a
 )
 
-replace github.com/mokiat/wasmgpu => github.com/hulkholden/wasmgpu v0.0.0-20231121232708-bf306359c92d
+replace github.com/mokiat/wasmgpu => github.com/hulkholden/wasmgpu v0.0.0-20231122081935-6fff6aa1eaa2
