@@ -16,6 +16,11 @@ import (
 
 const (
 	numParticles = 3000
+
+	float32Size = 4
+
+	particleSize = 4 * float32Size
+	vertexSize   = 2 * float32Size
 )
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
@@ -33,16 +38,16 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 			Buffers: []wasmgpu.GPUVertexBufferLayout{
 				{
 					// instanced particles buffer
-					ArrayStride: 4 * 4,
+					ArrayStride: particleSize,
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, 0),   // position
-						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, 2*4), // velocity
+						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, 0),             // position
+						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, 2*float32Size), // velocity
 					},
 				},
 				{
 					// vertex buffer
-					ArrayStride: 2 * 4,
+					ArrayStride: vertexSize,
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
 					Attributes: []wasmgpu.GPUVertexAttribute{
 						makeGPUVertexAttribute(2, wasmgpu.GPUVertexFormatFloat32x2, 0), // position
@@ -104,7 +109,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 
 	spriteVertexBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:             wasmgpu.GPUSize64(len(vertexBufferData) * 4),
+		Size:             wasmgpu.GPUSize64(len(vertexBufferData) * float32Size),
 		Usage:            wasmgpu.GPUBufferUsageFlagsVertex,
 		MappedAtCreation: opt.V(true),
 	})
@@ -121,7 +126,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		0.005, // rule3Scale
 	}
 	simParamBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(simParams) * 4),
+		Size:  wasmgpu.GPUSize64(len(simParams) * float32Size),
 		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
 	})
 
@@ -132,18 +137,12 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 	// TODO: add sim params to GUI.
 
-	initialParticleData := make([]float32, numParticles*4)
-	for i := 0; i < numParticles; i++ {
-		initialParticleData[i*4+0] = 2 * (rand.Float32() - 0.5)
-		initialParticleData[i*4+1] = 2 * (rand.Float32() - 0.5)
-		initialParticleData[i*4+2] = 2 * (rand.Float32() - 0.5) * 0.1
-		initialParticleData[i*4+3] = 2 * (rand.Float32() - 0.5) * 0.1
-	}
+	initialParticleData := initParticleData(numParticles)
 
 	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
 	for i := 0; i < 2; i++ {
 		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-			Size:             wasmgpu.GPUSize64(len(initialParticleData) * 4),
+			Size:             wasmgpu.GPUSize64(len(initialParticleData) * float32Size),
 			Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
 			MappedAtCreation: opt.V(true),
 		})
@@ -177,6 +176,17 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 	r.initRenderCallback()
 	return nil
+}
+
+func initParticleData(n int) []float32 {
+	data := make([]float32, n*4)
+	for i := 0; i < n; i++ {
+		data[i*4+0] = 2 * (rand.Float32() - 0.5)
+		data[i*4+1] = 2 * (rand.Float32() - 0.5)
+		data[i*4+2] = 2 * (rand.Float32() - 0.5) * 0.1
+		data[i*4+3] = 2 * (rand.Float32() - 0.5) * 0.1
+	}
+	return data
 }
 
 type renderer struct {
