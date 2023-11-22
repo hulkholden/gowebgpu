@@ -155,26 +155,11 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	for i := 0; i < 2; i++ {
 		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 			Layout: computePipeline.GetBindGroupLayout(0),
-			Entries: []wasmgpu.GPUBindGroupEntry{
-				{
-					Binding: 0,
-					Resource: wasmgpu.GPUBufferBinding{
-						Buffer: simParamBuffer,
-					},
-				},
-				{
-					Binding: 1,
-					Resource: wasmgpu.GPUBufferBinding{
-						Buffer: particleBuffers[i],
-					},
-				},
-				{
-					Binding: 2,
-					Resource: wasmgpu.GPUBufferBinding{
-						Buffer: particleBuffers[(i+1)%2],
-					},
-				},
-			},
+			Entries: makeGPUBindingGroupEntries(
+				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i]},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2]},
+			),
 		})
 	}
 
