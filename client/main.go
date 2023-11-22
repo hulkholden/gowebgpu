@@ -150,10 +150,10 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 	initialParticleData := make([]float32, numParticles*4)
 	for i := 0; i < numParticles; i++ {
-		initialParticleData[i*4+0] = 0.01 + 2*(rand.Float32()-0.5)
-		initialParticleData[i*4+1] = 0.01 + 2*(rand.Float32()-0.5)
-		initialParticleData[i*4+2] = 0.01 + 2*(rand.Float32()-0.5)*0.1
-		initialParticleData[i*4+3] = 0.01 + 2*(rand.Float32()-0.5)*0.1
+		initialParticleData[i*4+0] = 2 * (rand.Float32() - 0.5)
+		initialParticleData[i*4+1] = 2 * (rand.Float32() - 0.5)
+		initialParticleData[i*4+2] = 2 * (rand.Float32() - 0.5) * 0.1
+		initialParticleData[i*4+3] = 2 * (rand.Float32() - 0.5) * 0.1
 	}
 
 	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
