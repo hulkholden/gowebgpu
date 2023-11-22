@@ -17,6 +17,7 @@ go_library(
     importpath = "github.com/hulkholden/gowebgpu/client",
     visibility = ["//visibility:private"],
     deps = [
+        "//client/browser",
         "@com_github_mokiat_gog//opt",
         "@com_github_mokiat_wasmgpu//:wasmgpu",
     ],

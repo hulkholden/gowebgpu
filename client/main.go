@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 	"time"
 
+	"github.com/hulkholden/gowebgpu/client/browser"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -261,15 +262,8 @@ func (r *renderer) initRenderCallback() {
 		r.initRenderCallback()
 		return nil
 	})
-	Window().RequestAnimationFrame(frame)
+	browser.Window().RequestAnimationFrame(frame)
 }
-
-type HTMLWindow struct{ jsValue js.Value }
-
-func Window() HTMLWindow {
-	return HTMLWindow{js.Global().Get("window")}
-}
-func (w HTMLWindow) RequestAnimationFrame(fn js.Func) { w.jsValue.Call("requestAnimationFrame", fn) }
 
 func loadShaderModule(device wasmgpu.GPUDevice, url string) (wasmgpu.GPUShaderModule, error) {
 	bytes, err := loadFile(url)
