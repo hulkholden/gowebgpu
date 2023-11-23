@@ -25,7 +25,7 @@ const (
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
-	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl")
+	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", "")
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
@@ -71,8 +71,30 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
+	simParams := []float32{
+		0.04,  // deltaT
+		0.1,   // rule1Distance
+		0.025, // rule2Distance
+		0.025, // rule3Distance
+		0.02,  // rule1Scale
+		0.05,  // rule2Scale
+		0.005, // rule3Scale
+	}
+	simParamsDefinition := `
+	struct SimParams {
+		deltaT : f32,
+		rule1Distance : f32,
+		rule2Distance : f32,
+		rule3Distance : f32,
+		rule1Scale : f32,
+		rule2Scale : f32,
+		rule3Scale : f32,
+	  }
+	`
+	structDefinitions := simParamsDefinition
+
 	// Compute
-	updateSpritesShaderModule, err := loadShaderModule(device, "/static/shaders/compute.wgsl")
+	updateSpritesShaderModule, err := loadShaderModule(device, "/static/shaders/compute.wgsl", structDefinitions)
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
@@ -116,15 +138,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	setFloat32Array(float32ArrayCtor.New(spriteVertexBuffer.GetMappedRange(0, 0)), vertexBufferData)
 	spriteVertexBuffer.Unmap()
 
-	simParams := []float32{
-		0.04,  // deltaT
-		0.1,   // rule1Distance
-		0.025, // rule2Distance
-		0.025, // rule3Distance
-		0.02,  // rule1Scale
-		0.05,  // rule2Scale
-		0.005, // rule3Scale
-	}
 	simParamBuffer := initUniformBuffer(device, simParams)
 
 	// TODO: add sim params to GUI.
@@ -206,14 +219,14 @@ func initRenderCallback(update func()) {
 	browser.Window().RequestAnimationFrame(frame)
 }
 
-func loadShaderModule(device wasmgpu.GPUDevice, url string) (wasmgpu.GPUShaderModule, error) {
+func loadShaderModule(device wasmgpu.GPUDevice, url, prologue string) (wasmgpu.GPUShaderModule, error) {
 	bytes, err := loadFile(url)
 	if err != nil {
 		return wasmgpu.GPUShaderModule{}, fmt.Errorf("loading shader: %v", err)
 	}
 
 	return device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-		Code: string(bytes),
+		Code: prologue + "\n" + string(bytes),
 	}), nil
 }
 
