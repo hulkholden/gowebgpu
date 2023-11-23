@@ -162,19 +162,35 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		})
 	}
 
-	r := renderer{
-		device:                device,
-		context:               context,
-		computePassDescriptor: computePassDescriptor,
-		computePipeline:       computePipeline,
-		renderPassDescriptor:  renderPassDescriptor,
-		renderPipeline:        renderPipeline,
+	t := 0
+	update := func() {
+		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
+		commandEncoder := device.CreateCommandEncoder()
 
-		particleBindGroups: particleBindGroups,
-		particleBuffers:    particleBuffers,
-		spriteVertexBuffer: spriteVertexBuffer,
+		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
+			passEncoder.SetPipeline(computePipeline)
+			passEncoder.SetBindGroup(0, particleBindGroups[t%2], nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
+			passEncoder.End()
+		}
+		{
+			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
+			passEncoder.SetPipeline(renderPipeline)
+			passEncoder.SetVertexBuffer(0, particleBuffers[(t+1)%2], opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.SetVertexBuffer(1, spriteVertexBuffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
+			passEncoder.End()
+		}
+
+		device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
+			commandEncoder.Finish(),
+		})
+
+		t++
 	}
-	r.initRenderCallback()
+
+	initRenderCallback(update)
 	return nil
 }
 
@@ -189,51 +205,10 @@ func initParticleData(n int) []float32 {
 	return data
 }
 
-type renderer struct {
-	t int
-
-	device  wasmgpu.GPUDevice
-	context wasmgpu.GPUCanvasContext
-
-	computePassDescriptor wasmgpu.GPUComputePassDescriptor
-	computePipeline       wasmgpu.GPUComputePipeline
-
-	renderPassDescriptor wasmgpu.GPURenderPassDescriptor
-	renderPipeline       wasmgpu.GPURenderPipeline
-
-	particleBindGroups []wasmgpu.GPUBindGroup
-	particleBuffers    []wasmgpu.GPUBuffer
-	spriteVertexBuffer wasmgpu.GPUBuffer
-}
-
-func (r *renderer) initRenderCallback() {
+func initRenderCallback(update func()) {
 	frame := js.FuncOf(func(this js.Value, args []js.Value) any {
-		r.renderPassDescriptor.ColorAttachments[0].View = r.context.GetCurrentTexture().CreateView()
-
-		commandEncoder := r.device.CreateCommandEncoder()
-
-		{
-			passEncoder := commandEncoder.BeginComputePass(opt.V(r.computePassDescriptor))
-			passEncoder.SetPipeline(r.computePipeline)
-			passEncoder.SetBindGroup(0, r.particleBindGroups[r.t%2], nil)
-			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
-			passEncoder.End()
-		}
-		{
-			passEncoder := commandEncoder.BeginRenderPass(r.renderPassDescriptor)
-			passEncoder.SetPipeline(r.renderPipeline)
-			passEncoder.SetVertexBuffer(0, r.particleBuffers[(r.t+1)%2], opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
-			passEncoder.SetVertexBuffer(1, r.spriteVertexBuffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
-			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
-			passEncoder.End()
-		}
-
-		r.device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
-			commandEncoder.Finish(),
-		})
-
-		r.t++
-		r.initRenderCallback()
+		update()
+		initRenderCallback(update)
 		return nil
 	})
 	browser.Window().RequestAnimationFrame(frame)
