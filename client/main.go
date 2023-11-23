@@ -125,15 +125,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		0.05,  // rule2Scale
 		0.005, // rule3Scale
 	}
-	simParamBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(simParams) * float32Size),
-		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
-	})
-
-	updateSimParams := func() {
-		device.Queue().WriteBuffer(simParamBuffer, 0, asByteSlice(simParams))
-	}
-	updateSimParams()
+	simParamBuffer := initParamBuffer(device, simParams)
 
 	// TODO: add sim params to GUI.
 
@@ -155,7 +147,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 			Layout: computePipeline.GetBindGroupLayout(0),
 			Entries: makeGPUBindingGroupEntries(
-				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer},
+				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.buffer},
 				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i]},
 				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2]},
 			),
@@ -192,6 +184,31 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 	initRenderCallback(update)
 	return nil
+}
+
+type paramBuffer struct {
+	device wasmgpu.GPUDevice
+	values []float32
+	buffer wasmgpu.GPUBuffer
+}
+
+func initParamBuffer(device wasmgpu.GPUDevice, values []float32) paramBuffer {
+	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
+		Size:  wasmgpu.GPUSize64(len(values) * float32Size),
+		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
+	})
+
+	pb := paramBuffer{
+		device: device,
+		values: values,
+		buffer: buffer,
+	}
+	pb.updateBuffer()
+	return pb
+}
+
+func (pb paramBuffer) updateBuffer() {
+	pb.device.Queue().WriteBuffer(pb.buffer, 0, asByteSlice(pb.values))
 }
 
 func initParticleData(n int) []float32 {
