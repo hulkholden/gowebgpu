@@ -125,7 +125,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		0.05,  // rule2Scale
 		0.005, // rule3Scale
 	}
-	simParamBuffer := initParamBuffer(device, simParams)
+	simParamBuffer := initUniformBuffer(device, simParams)
 
 	// TODO: add sim params to GUI.
 
@@ -184,31 +184,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 	initRenderCallback(update)
 	return nil
-}
-
-type paramBuffer struct {
-	device wasmgpu.GPUDevice
-	values []float32
-	buffer wasmgpu.GPUBuffer
-}
-
-func initParamBuffer(device wasmgpu.GPUDevice, values []float32) paramBuffer {
-	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(values) * float32Size),
-		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
-	})
-
-	pb := paramBuffer{
-		device: device,
-		values: values,
-		buffer: buffer,
-	}
-	pb.updateBuffer()
-	return pb
-}
-
-func (pb paramBuffer) updateBuffer() {
-	pb.device.Queue().WriteBuffer(pb.buffer, 0, asByteSlice(pb.values))
 }
 
 func initParticleData(n int) []float32 {

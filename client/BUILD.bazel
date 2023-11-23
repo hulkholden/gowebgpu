@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "main.go",
         "types.go",
+        "uniform_buffer.go",
         "wasmgpu_helpers.go",
     ],
     importpath = "github.com/hulkholden/gowebgpu/client",
