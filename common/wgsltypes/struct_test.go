@@ -21,34 +21,39 @@ func TestNewStruct(t *testing.T) {
 		t.Fatalf("NewStruct() = %v, want nil error", err)
 	}
 	want := Struct{
-		Name: "testStruct",
-		Size: 44,
-		Fields: []Field{
-			{
+		Name:   "testStruct",
+		Size:   44,
+		Fields: []string{"foo", "vec2", "vec3", "vec4", "bar"},
+		FieldMap: map[string]Field{
+			"foo": {
 				Name:   "foo",
 				Offset: 0,
 				WGSLType: wgslType{
 					Name: "f32",
 				},
-			}, {
+			},
+			"vec2": {
 				Name:   "vec2",
 				Offset: 4,
 				WGSLType: wgslType{
 					Name: "vec2<f32>",
 				},
-			}, {
+			},
+			"vec3": {
 				Name:   "vec3",
 				Offset: 12,
 				WGSLType: wgslType{
 					Name: "vec3<f32>",
 				},
-			}, {
+			},
+			"vec4": {
 				Name:   "vec4",
 				Offset: 24,
 				WGSLType: wgslType{
 					Name: "vec4<f32>",
 				},
-			}, {
+			},
+			"bar": {
 				Name:   "bar",
 				Offset: 40,
 				WGSLType: wgslType{

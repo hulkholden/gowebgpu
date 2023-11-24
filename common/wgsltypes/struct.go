@@ -23,10 +23,13 @@ type wgslType struct {
 type Struct struct {
 	// Name is the name of the struct as it appears in Go.
 	Name string
-	// Fields is a list of fields of the struct, in order.
-	Fields []Field
 	// Size of the structure, in bytes.
 	Size int
+
+	// Fields is a slice of the struct's fields, in declaration order.
+	Fields []string
+	// FieldMap maps field names to Fields.
+	FieldMap map[string]Field
 }
 
 // A Field provides information about a particular field in a Go struct.
@@ -57,8 +60,9 @@ func NewStruct[T any](name string) (Struct, error) {
 	}
 
 	s := Struct{
-		Name: name,
-		Size: int(structType.Size()),
+		Name:     name,
+		Size:     int(structType.Size()),
+		FieldMap: make(map[string]Field),
 	}
 
 	for i := 0; i < structType.NumField(); i++ {
@@ -71,11 +75,12 @@ func NewStruct[T any](name string) (Struct, error) {
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType)
 		}
-		s.Fields = append(s.Fields, Field{
+		s.Fields = append(s.Fields, field.Name)
+		s.FieldMap[field.Name] = Field{
 			Name:     field.Name,
 			Offset:   field.Offset,
 			WGSLType: wgslType,
-		})
+		}
 	}
 	return s, nil
 }
@@ -84,9 +89,20 @@ func NewStruct[T any](name string) (Struct, error) {
 func (s Struct) ToWGSL() string {
 	var output strings.Builder
 	output.WriteString(fmt.Sprintf("struct %s {\n", s.Name))
-	for _, f := range s.Fields {
-		output.WriteString(fmt.Sprintf("  %s : %s,\n", f.Name, f.WGSLType.Name))
+	for _, fieldName := range s.Fields {
+		f := s.FieldMap[fieldName]
+		output.WriteString(fmt.Sprintf("  %s : %s,\n", fieldName, f.WGSLType.Name))
 	}
 	output.WriteString("}\n")
 	return output.String()
+}
+
+// MustOffsetOf returns the offset of the specified field.
+// Panics if the field is not found.
+func (s *Struct) MustOffsetOf(fieldName string) int {
+	field, ok := s.FieldMap[fieldName]
+	if !ok {
+		panic("unknown field: " + fieldName)
+	}
+	return int(field.Offset)
 }
