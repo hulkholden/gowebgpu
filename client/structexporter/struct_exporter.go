@@ -7,7 +7,12 @@ import (
 )
 
 var goToWGSLTypeMap = map[string]wgslType{
+	// Builtin types.
 	"float32": {Name: "f32"},
+	// Custom types.
+	"github.com/hulkholden/gowebgpu/common/vmath.V2": {Name: "vec2<f32>"},
+	"github.com/hulkholden/gowebgpu/common/vmath.V3": {Name: "vec3<f32>"},
+	"github.com/hulkholden/gowebgpu/common/vmath.V4": {Name: "vec4<f32>"},
 }
 
 type wgslType struct {
@@ -55,9 +60,13 @@ func New[T any](name string) (Struct, error) {
 
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
-		wgslType, ok := goToWGSLTypeMap[field.Type.Name()]
+		fieldType := field.Type.Name()
+		if path := field.Type.PkgPath(); path != "" {
+			fieldType = path + "." + fieldType
+		}
+		wgslType, ok := goToWGSLTypeMap[fieldType]
 		if !ok {
-			return Struct{}, fmt.Errorf("unhandled Go type: %q", field.Type)
+			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType)
 		}
 		s.Fields = append(s.Fields, Field{
 			Name:     field.Name,

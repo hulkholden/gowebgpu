@@ -11,5 +11,8 @@ go_test(
     name = "structexporter_test",
     srcs = ["struct_exporter_test.go"],
     embed = [":structexporter"],
-    deps = ["@com_github_google_go_cmp//cmp"],
+    deps = [
+        "//common/vmath",
+        "@com_github_google_go_cmp//cmp",
+    ],
 )

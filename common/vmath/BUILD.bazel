@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vmath",
+    srcs = [
+        "vector2.go",
+        "vector3.go",
+        "vector4.go",
+    ],
+    importpath = "github.com/hulkholden/gowebgpu/common/vmath",
+    visibility = ["//visibility:public"],
+)
