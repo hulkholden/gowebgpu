@@ -17,14 +17,7 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
-const (
-	numParticles = 3000
-
-	float32Size = 4
-
-	particleSize = 4 * float32Size
-	vertexSize   = 2 * float32Size
-)
+const numParticles = 3000
 
 type SimParams struct {
 	deltaT        float32
@@ -41,9 +34,14 @@ type Particle struct {
 	vel vmath.V2
 }
 
+type Vertex struct {
+	pos vmath.V2
+}
+
 var (
 	simParamsStruct = wgsltypes.MustNewStruct[SimParams]("SimParams")
 	particleStruct  = wgsltypes.MustNewStruct[Particle]("Particle")
+	vertexStruct    = wgsltypes.MustNewStruct[Vertex]("Vertex")
 )
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
@@ -61,7 +59,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 			Buffers: []wasmgpu.GPUVertexBufferLayout{
 				{
 					// instanced particles buffer
-					ArrayStride: particleSize,
+					ArrayStride: wasmgpu.GPUSize64(particleStruct.Size),
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
 					Attributes: []wasmgpu.GPUVertexAttribute{
 						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(particleStruct.MustOffsetOf("pos"))),
@@ -70,10 +68,10 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 				},
 				{
 					// vertex buffer
-					ArrayStride: vertexSize,
+					ArrayStride: wasmgpu.GPUSize64(vertexStruct.Size),
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(2, wasmgpu.GPUVertexFormatFloat32x2, 0), // position
+						makeGPUVertexAttribute(2, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(vertexStruct.MustOffsetOf("pos"))),
 					},
 				},
 			},
