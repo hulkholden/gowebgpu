@@ -64,8 +64,8 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					ArrayStride: particleSize,
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, 0),             // position
-						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, 2*float32Size), // velocity
+						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(particleStruct.MustOffsetOf("pos"))),
+						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(particleStruct.MustOffsetOf("vel"))),
 					},
 				},
 				{
