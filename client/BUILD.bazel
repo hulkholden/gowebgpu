@@ -20,8 +20,8 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//client/browser",
-        "//client/structexporter",
         "//common/vmath",
+        "//common/wgsltypes",
         "@com_github_mokiat_gog//opt",
         "@com_github_mokiat_wasmgpu//:wasmgpu",
     ],

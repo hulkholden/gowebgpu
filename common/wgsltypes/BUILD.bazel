@@ -1,0 +1,35 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "wsgltypes",
+    srcs = ["struct.go"],
+    importpath = "github.com/hulkholden/gowebgpu/common/wsgltypes",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "wsgltypes_test",
+    srcs = ["struct_test.go"],
+    embed = [":wsgltypes"],
+    deps = [
+        "//common/vmath",
+        "@com_github_google_go_cmp//cmp",
+    ],
+)
+
+go_library(
+    name = "wgsltypes",
+    srcs = ["struct.go"],
+    importpath = "github.com/hulkholden/gowebgpu/common/wgsltypes",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "wgsltypes_test",
+    srcs = ["struct_test.go"],
+    embed = [":wgsltypes"],
+    deps = [
+        "//common/vmath",
+        "@com_github_google_go_cmp//cmp",
+    ],
+)

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/hulkholden/gowebgpu/client/browser"
-	"github.com/hulkholden/gowebgpu/client/structexporter"
 	"github.com/hulkholden/gowebgpu/common/vmath"
+	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -46,8 +46,8 @@ type Particle struct {
 }
 
 var (
-	simParamsStruct = structexporter.MustNew[SimParams]("SimParams")
-	particleStruct  = structexporter.MustNew[Particle]("Particle")
+	simParamsStruct = wgsltypes.MustNew[SimParams]("SimParams")
+	particleStruct  = wgsltypes.MustNew[Particle]("Particle")
 )
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
@@ -107,7 +107,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		rule2Scale:    0.05,
 		rule3Scale:    0.005,
 	}
-	structDefinitions := []structexporter.Struct{
+	structDefinitions := []wgsltypes.Struct{
 		simParamsStruct,
 		particleStruct,
 	}
@@ -238,7 +238,7 @@ func initRenderCallback(update func()) {
 	browser.Window().RequestAnimationFrame(frame)
 }
 
-func loadShaderModule(device wasmgpu.GPUDevice, url string, structs []structexporter.Struct) (wasmgpu.GPUShaderModule, error) {
+func loadShaderModule(device wasmgpu.GPUDevice, url string, structs []wgsltypes.Struct) (wasmgpu.GPUShaderModule, error) {
 	bytes, err := loadFile(url)
 	if err != nil {
 		return wasmgpu.GPUShaderModule{}, fmt.Errorf("loading shader: %v", err)

@@ -1,4 +1,4 @@
-package structexporter
+package wgsltypes
 
 import (
 	"fmt"
