@@ -25,6 +25,8 @@ type Struct struct {
 	Name string
 	// Fields is a list of fields of the struct, in order.
 	Fields []Field
+	// Size of the structure, in bytes.
+	Size int
 }
 
 // A Field provides information about a particular field in a Go struct.
@@ -56,6 +58,7 @@ func NewStruct[T any](name string) (Struct, error) {
 
 	s := Struct{
 		Name: name,
+		Size: int(structType.Size()),
 	}
 
 	for i := 0; i < structType.NumField(); i++ {

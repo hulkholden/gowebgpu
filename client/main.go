@@ -160,11 +160,9 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	initialParticleData := initParticleData(numParticles)
 
 	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
-	// TODO: Use the Struct to get the element size.
-	particleSizeof := float32Size * 4
 	for i := 0; i < 2; i++ {
 		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-			Size:             wasmgpu.GPUSize64(len(initialParticleData) * particleSizeof),
+			Size:             wasmgpu.GPUSize64(len(initialParticleData) * particleStruct.Size),
 			Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
 			MappedAtCreation: opt.V(true),
 		})
