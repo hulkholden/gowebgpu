@@ -22,6 +22,7 @@ func TestNewStruct(t *testing.T) {
 	}
 	want := Struct{
 		Name: "testStruct",
+		Size: 44,
 		Fields: []Field{
 			{
 				Name:   "foo",
