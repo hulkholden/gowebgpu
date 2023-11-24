@@ -160,13 +160,15 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	initialParticleData := initParticleData(numParticles)
 
 	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
+	// TODO: Use the Struct to get the element size.
+	particleSizeof := float32Size * 4
 	for i := 0; i < 2; i++ {
 		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-			Size:             wasmgpu.GPUSize64(len(initialParticleData) * float32Size),
+			Size:             wasmgpu.GPUSize64(len(initialParticleData) * particleSizeof),
 			Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
 			MappedAtCreation: opt.V(true),
 		})
-		setFloat32Array(float32ArrayCtor.New(particleBuffers[i].GetMappedRange(0, 0)), initialParticleData)
+		js.CopyBytesToJS(uint8ArrayCtor.New(particleBuffers[i].GetMappedRange(0, 0)), sliceAsBytesSlice(initialParticleData))
 		particleBuffers[i].Unmap()
 	}
 
@@ -214,13 +216,13 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	return nil
 }
 
-func initParticleData(n int) []float32 {
-	data := make([]float32, n*4)
+func initParticleData(n int) []Particle {
+	data := make([]Particle, n)
 	for i := 0; i < n; i++ {
-		data[i*4+0] = 2 * (rand.Float32() - 0.5)
-		data[i*4+1] = 2 * (rand.Float32() - 0.5)
-		data[i*4+2] = 2 * (rand.Float32() - 0.5) * 0.1
-		data[i*4+3] = 2 * (rand.Float32() - 0.5) * 0.1
+		data[i].pos.X = 2 * (rand.Float32() - 0.5)
+		data[i].pos.Y = 2 * (rand.Float32() - 0.5)
+		data[i].vel.X = 2 * (rand.Float32() - 0.5) * 0.1
+		data[i].vel.Y = 2 * (rand.Float32() - 0.5) * 0.1
 	}
 	return data
 }
