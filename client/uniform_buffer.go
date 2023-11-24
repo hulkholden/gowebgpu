@@ -1,28 +1,31 @@
 package main
 
-import "github.com/mokiat/wasmgpu"
+import (
+	"unsafe"
+
+	"github.com/mokiat/wasmgpu"
+)
 
 type UniformBuffer struct {
 	device wasmgpu.GPUDevice
-	values []float32
 	buffer wasmgpu.GPUBuffer
 }
 
-func initUniformBuffer(device wasmgpu.GPUDevice, values []float32) UniformBuffer {
+func initUniformBuffer[T any](device wasmgpu.GPUDevice, values T) UniformBuffer {
+	byteLen := unsafe.Sizeof(values)
 	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(len(values) * float32Size),
+		Size:  wasmgpu.GPUSize64(byteLen),
 		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
 	})
 
 	b := UniformBuffer{
 		device: device,
-		values: values,
 		buffer: buffer,
 	}
-	b.updateBuffer()
+	b.updateBuffer(structAsByteSlice(values))
 	return b
 }
 
-func (b UniformBuffer) updateBuffer() {
-	b.device.Queue().WriteBuffer(b.buffer, 0, asByteSlice(b.values))
+func (b UniformBuffer) updateBuffer(bytes []byte) {
+	b.device.Queue().WriteBuffer(b.buffer, 0, bytes)
 }

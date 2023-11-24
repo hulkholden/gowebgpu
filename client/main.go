@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hulkholden/gowebgpu/client/browser"
+	"github.com/hulkholden/gowebgpu/client/structexporter"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -71,27 +72,20 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
-	simParams := []float32{
-		0.04,  // deltaT
-		0.1,   // rule1Distance
-		0.025, // rule2Distance
-		0.025, // rule3Distance
-		0.02,  // rule1Scale
-		0.05,  // rule2Scale
-		0.005, // rule3Scale
+	simParams := SimParams{
+		deltaT:        0.04,
+		rule1Distance: 0.1,
+		rule2Distance: 0.025,
+		rule3Distance: 0.025,
+		rule1Scale:    0.02,
+		rule2Scale:    0.05,
+		rule3Scale:    0.005,
 	}
-	simParamsDefinition := `
-	struct SimParams {
-		deltaT : f32,
-		rule1Distance : f32,
-		rule2Distance : f32,
-		rule3Distance : f32,
-		rule1Scale : f32,
-		rule2Scale : f32,
-		rule3Scale : f32,
-	  }
-	`
-	structDefinitions := simParamsDefinition
+	simParamsStruct, err := structexporter.New("SimParams", simParams)
+	if err != nil {
+		return fmt.Errorf("exporting simParams: %v", err)
+	}
+	structDefinitions := simParamsStruct.ToWGSL()
 
 	// Compute
 	updateSpritesShaderModule, err := loadShaderModule(device, "/static/shaders/compute.wgsl", structDefinitions)
@@ -197,6 +191,16 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 	initRenderCallback(update)
 	return nil
+}
+
+type SimParams struct {
+	deltaT        float32
+	rule1Distance float32
+	rule2Distance float32
+	rule3Distance float32
+	rule1Scale    float32
+	rule2Scale    float32
+	rule3Scale    float32
 }
 
 func initParticleData(n int) []float32 {
