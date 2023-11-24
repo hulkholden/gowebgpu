@@ -1,7 +1,3 @@
-struct Particle {
-  pos : vec2<f32>,
-  vel : vec2<f32>,
-}
 struct Particles {
   particles : array<Particle>,
 }

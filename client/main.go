@@ -6,11 +6,13 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"syscall/js"
 	"time"
 
 	"github.com/hulkholden/gowebgpu/client/browser"
 	"github.com/hulkholden/gowebgpu/client/structexporter"
+	"github.com/hulkholden/gowebgpu/common/vmath"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -24,17 +26,33 @@ const (
 	vertexSize   = 2 * float32Size
 )
 
-var (
-	simParamsStruct structexporter.Struct
-)
-
-func init() {
-	simParamsStruct = structexporter.MustNew[SimParams]("SimParams")
+type SimParams struct {
+	deltaT        float32
+	rule1Distance float32
+	rule2Distance float32
+	rule3Distance float32
+	rule1Scale    float32
+	rule2Scale    float32
+	rule3Scale    float32
 }
+
+type Vector2 struct {
+	x, y float32
+}
+
+type Particle struct {
+	pos vmath.V2
+	vel vmath.V2
+}
+
+var (
+	simParamsStruct = structexporter.MustNew[SimParams]("SimParams")
+	particleStruct  = structexporter.MustNew[Particle]("Particle")
+)
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
-	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", "")
+	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", nil)
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
 	}
@@ -89,7 +107,10 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		rule2Scale:    0.05,
 		rule3Scale:    0.005,
 	}
-	structDefinitions := simParamsStruct.ToWGSL()
+	structDefinitions := []structexporter.Struct{
+		simParamsStruct,
+		particleStruct,
+	}
 
 	// Compute
 	updateSpritesShaderModule, err := loadShaderModule(device, "/static/shaders/compute.wgsl", structDefinitions)
@@ -197,16 +218,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	return nil
 }
 
-type SimParams struct {
-	deltaT        float32
-	rule1Distance float32
-	rule2Distance float32
-	rule3Distance float32
-	rule1Scale    float32
-	rule2Scale    float32
-	rule3Scale    float32
-}
-
 func initParticleData(n int) []float32 {
 	data := make([]float32, n*4)
 	for i := 0; i < n; i++ {
@@ -227,11 +238,17 @@ func initRenderCallback(update func()) {
 	browser.Window().RequestAnimationFrame(frame)
 }
 
-func loadShaderModule(device wasmgpu.GPUDevice, url, prologue string) (wasmgpu.GPUShaderModule, error) {
+func loadShaderModule(device wasmgpu.GPUDevice, url string, structs []structexporter.Struct) (wasmgpu.GPUShaderModule, error) {
 	bytes, err := loadFile(url)
 	if err != nil {
 		return wasmgpu.GPUShaderModule{}, fmt.Errorf("loading shader: %v", err)
 	}
+
+	defs := make([]string, len(structs))
+	for i, s := range structs {
+		defs[i] = s.ToWGSL()
+	}
+	prologue := strings.Join(defs, "\n")
 
 	return device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
 		Code: prologue + "\n" + string(bytes),

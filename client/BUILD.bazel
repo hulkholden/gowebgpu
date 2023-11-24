@@ -21,6 +21,7 @@ go_library(
     deps = [
         "//client/browser",
         "//client/structexporter",
+        "//common/vmath",
         "@com_github_mokiat_gog//opt",
         "@com_github_mokiat_wasmgpu//:wasmgpu",
     ],
