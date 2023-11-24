@@ -36,10 +36,6 @@ type SimParams struct {
 	rule3Scale    float32
 }
 
-type Vector2 struct {
-	x, y float32
-}
-
 type Particle struct {
 	pos vmath.V2
 	vel vmath.V2
