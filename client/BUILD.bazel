@@ -12,6 +12,7 @@ go_library(
     name = "client_lib",
     srcs = [
         "main.go",
+        "storage_buffer.go",
         "types.go",
         "uniform_buffer.go",
         "wasmgpu_helpers.go",

@@ -145,29 +145,16 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		-0.02, 0.0, 0.02,
 	}
 
-	spriteVertexBuffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:             wasmgpu.GPUSize64(len(vertexBufferData) * float32Size),
-		Usage:            wasmgpu.GPUBufferUsageFlagsVertex,
-		MappedAtCreation: opt.V(true),
-	})
-	setFloat32Array(float32ArrayCtor.New(spriteVertexBuffer.GetMappedRange(0, 0)), vertexBufferData)
-	spriteVertexBuffer.Unmap()
-
+	spriteVertexBuffer := initStorageBuffer(device, vertexBufferData)
 	simParamBuffer := initUniformBuffer(device, simParams)
 
 	// TODO: add sim params to GUI.
 
 	initialParticleData := initParticleData(numParticles)
 
-	particleBuffers := make([]wasmgpu.GPUBuffer, 2)
+	particleBuffers := make([]StorageBuffer, 2)
 	for i := 0; i < 2; i++ {
-		particleBuffers[i] = device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-			Size:             wasmgpu.GPUSize64(len(initialParticleData) * particleStruct.Size),
-			Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
-			MappedAtCreation: opt.V(true),
-		})
-		js.CopyBytesToJS(uint8ArrayCtor.New(particleBuffers[i].GetMappedRange(0, 0)), sliceAsBytesSlice(initialParticleData))
-		particleBuffers[i].Unmap()
+		particleBuffers[i] = initStorageBuffer(device, initialParticleData)
 	}
 
 	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
@@ -176,8 +163,8 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 			Layout: computePipeline.GetBindGroupLayout(0),
 			Entries: makeGPUBindingGroupEntries(
 				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.buffer},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i]},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2]},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].buffer},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].buffer},
 			),
 		})
 	}
@@ -197,8 +184,8 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		{
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
 			passEncoder.SetPipeline(renderPipeline)
-			passEncoder.SetVertexBuffer(0, particleBuffers[(t+1)%2], opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
-			passEncoder.SetVertexBuffer(1, spriteVertexBuffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.SetVertexBuffer(0, particleBuffers[(t+1)%2].buffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			passEncoder.SetVertexBuffer(1, spriteVertexBuffer.buffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
 			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
 			passEncoder.End()
 		}
