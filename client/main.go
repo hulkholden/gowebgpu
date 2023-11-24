@@ -46,8 +46,8 @@ type Particle struct {
 }
 
 var (
-	simParamsStruct = wgsltypes.MustNew[SimParams]("SimParams")
-	particleStruct  = wgsltypes.MustNew[Particle]("Particle")
+	simParamsStruct = wgsltypes.MustNewStruct[SimParams]("SimParams")
+	particleStruct  = wgsltypes.MustNewStruct[Particle]("Particle")
 )
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids

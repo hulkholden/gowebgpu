@@ -15,10 +15,10 @@ type testStruct struct {
 	bar  float32
 }
 
-func TestNew(t *testing.T) {
-	got, err := New[testStruct]("testStruct")
+func TestNewStruct(t *testing.T) {
+	got, err := NewStruct[testStruct]("testStruct")
 	if err != nil {
-		t.Fatalf("New() = %v, want nil error", err)
+		t.Fatalf("NewStruct() = %v, want nil error", err)
 	}
 	want := Struct{
 		Name: "testStruct",
@@ -62,9 +62,9 @@ func TestNew(t *testing.T) {
 }
 
 func TestToWGSL(t *testing.T) {
-	s, err := New[testStruct]("testStruct")
+	s, err := NewStruct[testStruct]("testStruct")
 	if err != nil {
-		t.Fatalf("New() failed unexpectedly: %v", err)
+		t.Fatalf("NewStruct() failed unexpectedly: %v", err)
 	}
 
 	got := s.ToWGSL()
