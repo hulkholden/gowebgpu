@@ -34,11 +34,16 @@ type Field struct {
 	WGSLType wgslType
 }
 
-func New(name string, t any) (Struct, error) {
-	if t == nil {
-		return Struct{}, fmt.Errorf("provided type is nil")
+func MustNew[T any](name string) Struct {
+	s, err := New[T](name)
+	if err != nil {
+		panic(fmt.Sprintf("exporting %q: %v", name, err))
 	}
+	return s
+}
 
+func New[T any](name string) (Struct, error) {
+	var t T
 	structType := reflect.TypeOf(t)
 	if structType.Kind() != reflect.Struct {
 		return Struct{}, fmt.Errorf("provided type is not a struct")

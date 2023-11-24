@@ -24,6 +24,14 @@ const (
 	vertexSize   = 2 * float32Size
 )
 
+var (
+	simParamsStruct structexporter.Struct
+)
+
+func init() {
+	simParamsStruct = structexporter.MustNew[SimParams]("SimParams")
+}
+
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", "")
@@ -80,10 +88,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		rule1Scale:    0.02,
 		rule2Scale:    0.05,
 		rule3Scale:    0.005,
-	}
-	simParamsStruct, err := structexporter.New("SimParams", simParams)
-	if err != nil {
-		return fmt.Errorf("exporting simParams: %v", err)
 	}
 	structDefinitions := simParamsStruct.ToWGSL()
 
