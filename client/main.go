@@ -46,6 +46,30 @@ var (
 
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
+	simParams := SimParams{
+		deltaT:        0.04,
+		rule1Distance: 0.1,
+		rule2Distance: 0.025,
+		rule3Distance: 0.025,
+		rule1Scale:    0.02,
+		rule2Scale:    0.05,
+		rule3Scale:    0.005,
+	}
+	simParamBuffer := initUniformBuffer(device, simParams)
+	// TODO: add sim params to GUI.
+
+	vertexBufferData := []float32{
+		-0.01, -0.02, 0.01,
+		-0.02, 0.0, 0.02,
+	}
+	spriteVertexBuffer := initStorageBuffer(device, vertexBufferData)
+
+	initialParticleData := initParticleData(numParticles)
+	particleBuffers := make([]StorageBuffer, 2)
+	for i := 0; i < 2; i++ {
+		particleBuffers[i] = initStorageBuffer(device, initialParticleData)
+	}
+
 	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", nil)
 	if err != nil {
 		return fmt.Errorf("loading shader: %v", err)
@@ -92,15 +116,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
-	simParams := SimParams{
-		deltaT:        0.04,
-		rule1Distance: 0.1,
-		rule2Distance: 0.025,
-		rule3Distance: 0.025,
-		rule1Scale:    0.02,
-		rule2Scale:    0.05,
-		rule3Scale:    0.005,
-	}
 	structDefinitions := []wgsltypes.Struct{
 		simParamsStruct,
 		particleStruct,
@@ -125,6 +140,18 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 	computePipeline := device.CreateComputePipeline(computePipelineDescriptor)
 
+	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
+	for i := 0; i < 2; i++ {
+		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
+			Layout: computePipeline.GetBindGroupLayout(0),
+			Entries: makeGPUBindingGroupEntries(
+				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.buffer},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].buffer},
+				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].buffer},
+			),
+		})
+	}
+
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
 		ColorAttachments: []wasmgpu.GPURenderPassColorAttachment{
 			{
@@ -137,35 +164,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	}
 
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
-
-	vertexBufferData := []float32{
-		-0.01, -0.02, 0.01,
-		-0.02, 0.0, 0.02,
-	}
-
-	spriteVertexBuffer := initStorageBuffer(device, vertexBufferData)
-	simParamBuffer := initUniformBuffer(device, simParams)
-
-	// TODO: add sim params to GUI.
-
-	initialParticleData := initParticleData(numParticles)
-
-	particleBuffers := make([]StorageBuffer, 2)
-	for i := 0; i < 2; i++ {
-		particleBuffers[i] = initStorageBuffer(device, initialParticleData)
-	}
-
-	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
-	for i := 0; i < 2; i++ {
-		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
-			Layout: computePipeline.GetBindGroupLayout(0),
-			Entries: makeGPUBindingGroupEntries(
-				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.buffer},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].buffer},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].buffer},
-			),
-		})
-	}
 
 	t := 0
 	update := func() {
