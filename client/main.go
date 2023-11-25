@@ -86,8 +86,8 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					ArrayStride: wasmgpu.GPUSize64(particleStruct.Size),
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(0, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(particleStruct.MustOffsetOf("pos"))),
-						makeGPUVertexAttribute(1, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(particleStruct.MustOffsetOf("vel"))),
+						makeGPUVertexAttribute(0, particleStruct, "pos"),
+						makeGPUVertexAttribute(1, particleStruct, "vel"),
 					},
 				},
 				{
@@ -95,7 +95,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 					ArrayStride: wasmgpu.GPUSize64(vertexStruct.Size),
 					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
 					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(2, wasmgpu.GPUVertexFormatFloat32x2, wasmgpu.GPUSize64(vertexStruct.MustOffsetOf("pos"))),
+						makeGPUVertexAttribute(2, vertexStruct, "pos"),
 					},
 				},
 			},

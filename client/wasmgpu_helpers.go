@@ -1,13 +1,31 @@
 package main
 
-import "github.com/mokiat/wasmgpu"
+import (
+	"github.com/hulkholden/gowebgpu/common/wgsltypes"
+	"github.com/mokiat/wasmgpu"
+)
 
-func makeGPUVertexAttribute(shaderLocation wasmgpu.GPUIndex32, format wasmgpu.GPUVertexFormat, offset wasmgpu.GPUSize64) wasmgpu.GPUVertexAttribute {
+var vertexFormatTypeMap = map[string]wasmgpu.GPUVertexFormat{
+	"f32":       wasmgpu.GPUVertexFormatFloat32,
+	"vec2<f32>": wasmgpu.GPUVertexFormatFloat32x2,
+	"vec3<f32>": wasmgpu.GPUVertexFormatFloat32x3,
+	"vec4<f32>": wasmgpu.GPUVertexFormatFloat32x4,
+}
+
+func makeGPUVertexAttribute(shaderLocation wasmgpu.GPUIndex32, s wgsltypes.Struct, fieldName string) wasmgpu.GPUVertexAttribute {
 	return wasmgpu.GPUVertexAttribute{
 		ShaderLocation: shaderLocation,
-		Format:         wasmgpu.GPUVertexFormatFloat32x2,
-		Offset:         offset,
+		Format:         mustFormatFromFieldType(s.FieldMap[fieldName].WGSLType.Name),
+		Offset:         wasmgpu.GPUSize64(s.MustOffsetOf(fieldName)),
 	}
+}
+
+func mustFormatFromFieldType(fieldType string) wasmgpu.GPUVertexFormat {
+	format, ok := vertexFormatTypeMap[fieldType]
+	if !ok {
+		panic("unhandled wgsltype: " + fieldType)
+	}
+	return format
 }
 
 func makeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmgpu.GPUBindGroupEntry {
