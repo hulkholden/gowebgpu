@@ -131,10 +131,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		Compute: wasmgpu.GPUProgrammableStage{
 			Module:     updateSpritesShaderModule,
 			EntryPoint: "main",
-			// Doesn't seem to work: https://bugs.chromium.org/p/dawn/issues/detail?id=2255
-			// Constants: opt.V(wasmgpu.GPUProgrammableStageConstants{
-			// 	"contant_u32": 13,
-			// }),
 		},
 	}
 	computePipeline := device.CreateComputePipeline(computePipelineDescriptor)
