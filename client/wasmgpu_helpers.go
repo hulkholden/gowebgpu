@@ -40,9 +40,15 @@ func makeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmg
 	return entries
 }
 
+type BufferDescriptor struct {
+	Struct *wgsltypes.Struct
+	// Instanced specifices whether the buffer is stepped as a vertex or instance buffer.
+	Instanced bool
+}
+
 type VertexAttribute struct {
-	Struct    *wgsltypes.Struct
-	FieldName string
+	BufferIndex int
+	FieldName   string
 }
 
 type VertexBuffers struct {
@@ -50,35 +56,27 @@ type VertexBuffers struct {
 	Buffers []wasmgpu.GPUBuffer
 }
 
-func newVertexBuffers(v []VertexAttribute) *VertexBuffers {
-	m := map[*wgsltypes.Struct]int{}
-
-	result := []wasmgpu.GPUVertexBufferLayout{}
-
-	for idx, a := range v {
-		bufIdx, ok := m[a.Struct]
-		if !ok {
-			bufIdx = len(result)
-			m[a.Struct] = bufIdx
-
-			// TODO: provide a way to declare the step mode.
-			// I'm not sure if it should be specified on Struct, or if we need
-			// another type to encapsulate Struct+StepMode.
-			stepMode := wasmgpu.GPUVertexStepModeInstance
-			if a.Struct.Name == "Vertex" {
-				stepMode = wasmgpu.GPUVertexStepModeVertex
-			}
-
-			layout := wasmgpu.GPUVertexBufferLayout{
-				ArrayStride: wasmgpu.GPUSize64(a.Struct.Size),
-				StepMode:    opt.V(stepMode),
-			}
-			result = append(result, layout)
+func newVertexBuffers(bufDefs []BufferDescriptor, vtxAttrs []VertexAttribute) *VertexBuffers {
+	result := make([]wasmgpu.GPUVertexBufferLayout, len(bufDefs))
+	for idx, bd := range bufDefs {
+		stepMode := wasmgpu.GPUVertexStepModeVertex
+		if bd.Instanced {
+			stepMode = wasmgpu.GPUVertexStepModeInstance
 		}
-
-		attribute := makeGPUVertexAttribute(idx, *a.Struct, a.FieldName)
-		result[bufIdx].Attributes = append(result[bufIdx].Attributes, attribute)
+		result[idx] = wasmgpu.GPUVertexBufferLayout{
+			ArrayStride: wasmgpu.GPUSize64(bd.Struct.Size),
+			StepMode:    opt.V(stepMode),
+		}
 	}
+
+	for idx, a := range vtxAttrs {
+		if a.BufferIndex >= len(result) {
+			panic("buffer index out of bounds")
+		}
+		attribute := makeGPUVertexAttribute(idx, *bufDefs[a.BufferIndex].Struct, a.FieldName)
+		result[a.BufferIndex].Attributes = append(result[a.BufferIndex].Attributes, attribute)
+	}
+
 	return &VertexBuffers{
 		Layout:  result,
 		Buffers: make([]wasmgpu.GPUBuffer, len(result)),

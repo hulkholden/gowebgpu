@@ -75,16 +75,20 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		return fmt.Errorf("loading shader: %v", err)
 	}
 
-	vertexBuffers := newVertexBuffers([]VertexAttribute{
-		{Struct: &particleStruct, FieldName: "pos"},
-		{Struct: &particleStruct, FieldName: "vel"},
-		{Struct: &vertexStruct, FieldName: "pos"},
-	})
-
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const particleBufferIdx = 0
 	const vertexBufferIdx = 1
 
+	bufDefs := []BufferDescriptor{
+		{Struct: &particleStruct, Instanced: true},
+		{Struct: &vertexStruct},
+	}
+	vtxAttrs := []VertexAttribute{
+		{BufferIndex: particleBufferIdx, FieldName: "pos"},
+		{BufferIndex: particleBufferIdx, FieldName: "vel"},
+		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
+	}
+	vertexBuffers := newVertexBuffers(bufDefs, vtxAttrs)
 	vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[0].buffer
 	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.buffer
 
