@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hulkholden/gowebgpu/common/wgsltypes"
+	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
 
@@ -12,9 +13,9 @@ var vertexFormatTypeMap = map[string]wasmgpu.GPUVertexFormat{
 	"vec4<f32>": wasmgpu.GPUVertexFormatFloat32x4,
 }
 
-func makeGPUVertexAttribute(shaderLocation wasmgpu.GPUIndex32, s wgsltypes.Struct, fieldName string) wasmgpu.GPUVertexAttribute {
+func makeGPUVertexAttribute(shaderLocation int, s wgsltypes.Struct, fieldName string) wasmgpu.GPUVertexAttribute {
 	return wasmgpu.GPUVertexAttribute{
-		ShaderLocation: shaderLocation,
+		ShaderLocation: wasmgpu.GPUIndex32(shaderLocation),
 		Format:         mustFormatFromFieldType(s.FieldMap[fieldName].WGSLType.Name),
 		Offset:         wasmgpu.GPUSize64(s.MustOffsetOf(fieldName)),
 	}
@@ -37,4 +38,56 @@ func makeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmg
 		}
 	}
 	return entries
+}
+
+type VertexAttribute struct {
+	Struct    *wgsltypes.Struct
+	FieldName string
+}
+
+type VertexBuffers struct {
+	Layout  []wasmgpu.GPUVertexBufferLayout
+	Buffers []wasmgpu.GPUBuffer
+}
+
+func newVertexBuffers(v []VertexAttribute) *VertexBuffers {
+	m := map[*wgsltypes.Struct]int{}
+
+	result := []wasmgpu.GPUVertexBufferLayout{}
+
+	for idx, a := range v {
+		bufIdx, ok := m[a.Struct]
+		if !ok {
+			bufIdx = len(result)
+			m[a.Struct] = bufIdx
+
+			// TODO: provide a way to declare the step mode.
+			// I'm not sure if it should be specified on Struct, or if we need
+			// another type to encapsulate Struct+StepMode.
+			stepMode := wasmgpu.GPUVertexStepModeInstance
+			if a.Struct.Name == "Vertex" {
+				stepMode = wasmgpu.GPUVertexStepModeVertex
+			}
+
+			layout := wasmgpu.GPUVertexBufferLayout{
+				ArrayStride: wasmgpu.GPUSize64(a.Struct.Size),
+				StepMode:    opt.V(stepMode),
+			}
+			result = append(result, layout)
+		}
+
+		attribute := makeGPUVertexAttribute(idx, *a.Struct, a.FieldName)
+		result[bufIdx].Attributes = append(result[bufIdx].Attributes, attribute)
+	}
+	return &VertexBuffers{
+		Layout:  result,
+		Buffers: make([]wasmgpu.GPUBuffer, len(result)),
+	}
+}
+
+func (v *VertexBuffers) Bind(passEncoder wasmgpu.GPURenderPassEncoder) {
+	unspecified := opt.Unspecified[wasmgpu.GPUSize64]()
+	for idx, buffer := range v.Buffers {
+		passEncoder.SetVertexBuffer(wasmgpu.GPUIndex32(idx), buffer, unspecified, unspecified)
+	}
 }

@@ -75,30 +75,25 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		return fmt.Errorf("loading shader: %v", err)
 	}
 
+	vertexBuffers := newVertexBuffers([]VertexAttribute{
+		{Struct: &particleStruct, FieldName: "pos"},
+		{Struct: &particleStruct, FieldName: "vel"},
+		{Struct: &vertexStruct, FieldName: "pos"},
+	})
+
+	// TODO: Figure out a nice way to retreive these from VertexBuffers.
+	const particleBufferIdx = 0
+	const vertexBufferIdx = 1
+
+	vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[0].buffer
+	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.buffer
+
 	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
 		// Layout: "auto",
 		Vertex: wasmgpu.GPUVertexState{
 			Module:     spriteShaderModule,
 			EntryPoint: "vertex_main",
-			Buffers: []wasmgpu.GPUVertexBufferLayout{
-				{
-					// instanced particles buffer
-					ArrayStride: wasmgpu.GPUSize64(particleStruct.Size),
-					StepMode:    opt.V(wasmgpu.GPUVertexStepModeInstance),
-					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(0, particleStruct, "pos"),
-						makeGPUVertexAttribute(1, particleStruct, "vel"),
-					},
-				},
-				{
-					// vertex buffer
-					ArrayStride: wasmgpu.GPUSize64(vertexStruct.Size),
-					StepMode:    opt.V(wasmgpu.GPUVertexStepModeVertex),
-					Attributes: []wasmgpu.GPUVertexAttribute{
-						makeGPUVertexAttribute(2, vertexStruct, "pos"),
-					},
-				},
-			},
+			Buffers:    vertexBuffers.Layout,
 		},
 		Fragment: opt.V(wasmgpu.GPUFragmentState{
 			Module:     spriteShaderModule,
@@ -170,6 +165,9 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
 		commandEncoder := device.CreateCommandEncoder()
 
+		// Flip the buffer used for rendering.
+		vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[(t+1)%2].buffer
+
 		{
 			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
 			passEncoder.SetPipeline(computePipeline)
@@ -180,8 +178,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		{
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
 			passEncoder.SetPipeline(renderPipeline)
-			passEncoder.SetVertexBuffer(0, particleBuffers[(t+1)%2].buffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
-			passEncoder.SetVertexBuffer(1, spriteVertexBuffer.buffer, opt.Unspecified[wasmgpu.GPUSize64](), opt.Unspecified[wasmgpu.GPUSize64]())
+			vertexBuffers.Bind(passEncoder)
 			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
 			passEncoder.End()
 		}
