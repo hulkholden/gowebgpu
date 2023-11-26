@@ -14,15 +14,22 @@ fn vertex_main(
     (a_pos.x * cos(angle)) - (a_pos.y * sin(angle)),
     (a_pos.x * sin(angle)) + (a_pos.y * cos(angle))
   );
-  
+  let pi = 3.14159265359;
+
   var output : VertexOutput;
   output.position = vec4(pos + a_particlePos, 0.0, 1.0);
-  output.color = vec4(
-    1.0 - sin(angle + 1.0) - a_particleVel.y,
-    pos.x * 100.0 - a_particleVel.y + 0.1,
-    a_particleVel.x + cos(angle + 0.5),
-    1.0);
+  var rgb = hsl2rgb(vec3((angle / pi) * 0.5 + 0.5, 1.0, 0.5));
+  output.color = vec4(rgb, 1.0);
   return output;
+}
+
+fn hsl2rgb(c : vec3<f32>) -> vec3<f32> {
+  let x = c.x * 6.0 + vec3(0.0,4.0,2.0);
+  let y = 6.0;
+  let m = x - y * floor(x/y); // mod(x, y);
+  let raw = abs(m - 3.0) - 1.0;
+  let rgb = clamp(raw, vec3<f32>(0.0), vec3<f32>(1.0));
+  return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
 }
 
 @fragment
