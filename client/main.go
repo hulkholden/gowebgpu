@@ -67,9 +67,9 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	spriteVertexBuffer := initStorageBuffer(device, vertexBufferData)
 
 	initialParticleData := initParticleData(numParticles)
-	particleBuffers := make([]StorageBuffer, 2)
-	for i := 0; i < 2; i++ {
-		particleBuffers[i] = initStorageBuffer(device, initialParticleData)
+	particleBuffers := []StorageBuffer{
+		initStorageBuffer(device, initialParticleData),
+		initStorageBuffer(device, initialParticleData),
 	}
 
 	spriteShaderModule, err := loadShaderModule(device, "/static/shaders/render.wgsl", nil)
