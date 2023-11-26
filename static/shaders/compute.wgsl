@@ -17,24 +17,23 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   var colVel = vec2(0.0);
   var cMassCount = 0u;
   var cVelCount = 0u;
-  var pos : vec2<f32>;
-  var vel : vec2<f32>;
 
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
     if (i == index) {
       continue;
     }
 
-    pos = particlesA.particles[i].pos.xy;
-    vel = particlesA.particles[i].vel.xy;
-    if (distance(pos, vPos) < params.rule1Distance) {
+    let pos = particlesA.particles[i].pos.xy;
+    let vel = particlesA.particles[i].vel.xy;
+    let dist = distance(pos, vPos);
+    if (dist < params.rule1Distance) {
       cMass += pos;
       cMassCount++;
     }
-    if (distance(pos, vPos) < params.rule2Distance) {
+    if (dist < params.rule2Distance) {
       colVel -= pos - vPos;
     }
-    if (distance(pos, vPos) < params.rule3Distance) {
+    if (dist < params.rule3Distance) {
       cVel += vel;
       cVelCount++;
     }
