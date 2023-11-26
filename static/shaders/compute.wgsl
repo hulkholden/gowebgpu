@@ -53,16 +53,16 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   vPos = vPos + (vVel * params.deltaT);
   // Wrap around boundary
   if (vPos.x < -1.0) {
-    vPos.x = 1.0;
+    vPos.x += 2.0;
   }
   if (vPos.x > 1.0) {
-    vPos.x = -1.0;
+    vPos.x -= -2.0;
   }
   if (vPos.y < -1.0) {
-    vPos.y = 1.0;
+    vPos.y += 2.0;
   }
   if (vPos.y > 1.0) {
-    vPos.y = -1.0;
+    vPos.y -= -2.0;
   }
 
   // Write back
