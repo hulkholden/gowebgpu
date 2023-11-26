@@ -91,8 +91,6 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
 	vertexBuffers := newVertexBuffers(bufDefs, vtxAttrs)
-	vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[0].buffer
-	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.buffer
 
 	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
 		// Layout: "auto",
@@ -169,6 +167,7 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 
 		// Flip the buffer used for rendering.
 		vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[(t+1)%2].buffer
+		vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.buffer
 
 		{
 			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
