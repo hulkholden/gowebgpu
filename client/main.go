@@ -58,9 +58,11 @@ func runComputeBoids(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext)
 	simParamBuffer := initUniformBuffer(device, simParams)
 	// TODO: add sim params to GUI.
 
+	const boidScale = 0.5
 	vertexBufferData := []float32{
-		-0.01, -0.02, 0.01,
-		-0.02, 0.0, 0.02,
+		-0.01 * boidScale, -0.02 * boidScale,
+		0.01 * boidScale, -0.02 * boidScale,
+		0.0 * boidScale, 0.02 * boidScale,
 	}
 	spriteVertexBuffer := initStorageBuffer(device, vertexBufferData)
 
