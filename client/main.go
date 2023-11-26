@@ -17,7 +17,7 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
-const numParticles = 3000
+const numParticles = 20000
 
 type SimParams struct {
 	deltaT        float32
