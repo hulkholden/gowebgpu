@@ -25,13 +25,14 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
     let pos = particlesA.particles[i].pos.xy;
     let vel = particlesA.particles[i].vel.xy;
-    let dist = distance(pos, vPos);
+    let dPos = pos - vPos;
+    let dist = length(dPos);
     if (dist < params.rule1Distance) {
       cMass += pos;
       cMassCount++;
     }
     if (dist < params.rule2Distance) {
-      colVel -= pos - vPos;
+      colVel -= dPos;
     }
     if (dist < params.rule3Distance) {
       cVel += vel;
