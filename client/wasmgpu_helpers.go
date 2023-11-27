@@ -6,7 +6,7 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
-var vertexFormatTypeMap = map[string]wasmgpu.GPUVertexFormat{
+var vertexFormatTypeMap = map[wgsltypes.TypeName]wasmgpu.GPUVertexFormat{
 	"f32":       wasmgpu.GPUVertexFormatFloat32,
 	"vec2<f32>": wasmgpu.GPUVertexFormatFloat32x2,
 	"vec3<f32>": wasmgpu.GPUVertexFormatFloat32x3,
@@ -21,7 +21,7 @@ func makeGPUVertexAttribute(shaderLocation int, s wgsltypes.Struct, fieldName st
 	}
 }
 
-func mustFormatFromFieldType(fieldType string) wasmgpu.GPUVertexFormat {
+func mustFormatFromFieldType(fieldType wgsltypes.TypeName) wasmgpu.GPUVertexFormat {
 	format, ok := vertexFormatTypeMap[fieldType]
 	if !ok {
 		panic("unhandled wgsltype: " + fieldType)

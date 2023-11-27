@@ -27,46 +27,34 @@ func TestNewStruct(t *testing.T) {
 		Fields: []string{"f32Val", "int32Val", "uint32Val", "vec2", "vec3", "vec4"},
 		FieldMap: map[string]Field{
 			"f32Val": {
-				Name:   "f32Val",
-				Offset: 0,
-				WGSLType: wgslType{
-					Name: "f32",
-				},
+				Name:     "f32Val",
+				Offset:   0,
+				WGSLType: Type{Name: "f32", AlignOf: 4, SizeOf: 4},
 			},
 			"int32Val": {
-				Name:   "int32Val",
-				Offset: 4,
-				WGSLType: wgslType{
-					Name: "i32",
-				},
+				Name:     "int32Val",
+				Offset:   4,
+				WGSLType: Type{Name: "i32", AlignOf: 4, SizeOf: 4},
 			},
 			"uint32Val": {
-				Name:   "uint32Val",
-				Offset: 8,
-				WGSLType: wgslType{
-					Name: "u32",
-				},
+				Name:     "uint32Val",
+				Offset:   8,
+				WGSLType: Type{Name: "u32", AlignOf: 4, SizeOf: 4},
 			},
 			"vec2": {
-				Name:   "vec2",
-				Offset: 12,
-				WGSLType: wgslType{
-					Name: "vec2<f32>",
-				},
+				Name:     "vec2",
+				Offset:   12,
+				WGSLType: Type{Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
 			},
 			"vec3": {
-				Name:   "vec3",
-				Offset: 20,
-				WGSLType: wgslType{
-					Name: "vec3<f32>",
-				},
+				Name:     "vec3",
+				Offset:   20,
+				WGSLType: Type{Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
 			},
 			"vec4": {
-				Name:   "vec4",
-				Offset: 32,
-				WGSLType: wgslType{
-					Name: "vec4<f32>",
-				},
+				Name:     "vec4",
+				Offset:   32,
+				WGSLType: Type{Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
 			},
 		},
 	}

@@ -6,19 +6,37 @@ import (
 	"strings"
 )
 
-var goToWGSLTypeMap = map[string]wgslType{
+// TypeName is the name of a WGSL type.
+type TypeName string
+
+// goToTypeMap maps Go types to WGSL types.
+var goToTypeMap = map[string]TypeName{
 	// Builtin types.
-	"float32": {Name: "f32"},
-	"int32":   {Name: "i32"},
-	"uint32":  {Name: "u32"},
+	"float32": "f32",
+	"int32":   "i32",
+	"uint32":  "u32",
 	// Custom types.
-	"github.com/hulkholden/gowebgpu/common/vmath.V2": {Name: "vec2<f32>"},
-	"github.com/hulkholden/gowebgpu/common/vmath.V3": {Name: "vec3<f32>"},
-	"github.com/hulkholden/gowebgpu/common/vmath.V4": {Name: "vec4<f32>"},
+	"github.com/hulkholden/gowebgpu/common/vmath.V2": "vec2<f32>",
+	"github.com/hulkholden/gowebgpu/common/vmath.V3": "vec3<f32>",
+	"github.com/hulkholden/gowebgpu/common/vmath.V4": "vec4<f32>",
 }
 
-type wgslType struct {
-	Name string
+var typeMap = map[TypeName]Type{
+	"f32":       {Name: "f32", AlignOf: 4, SizeOf: 4},
+	"i32":       {Name: "i32", AlignOf: 4, SizeOf: 4},
+	"u32":       {Name: "u32", AlignOf: 4, SizeOf: 4},
+	"vec2<f32>": {Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
+	"vec3<f32>": {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
+	"vec4<f32>": {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
+}
+
+type Type struct {
+	// Name of the WGSL type.
+	Name TypeName
+	// Alignment of the WGSL type (see https://www.w3.org/TR/WGSL/#alignof).
+	AlignOf int
+	// Size if the WGSL type (see https://www.w3.org/TR/WGSL/#sizeof).
+	SizeOf int
 }
 
 // A Struct provides information about a Go struct.
@@ -43,7 +61,7 @@ type Field struct {
 	Offset uintptr
 
 	// WGSLType is the corresponding WGSL type to use.
-	WGSLType wgslType
+	WGSLType Type
 }
 
 func MustNewStruct[T any](name string) Struct {
@@ -73,9 +91,13 @@ func NewStruct[T any](name string) (Struct, error) {
 		if path := field.Type.PkgPath(); path != "" {
 			fieldType = path + "." + fieldType
 		}
-		wgslType, ok := goToWGSLTypeMap[fieldType]
+		wgslTypeName, ok := goToTypeMap[fieldType]
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType)
+		}
+		wgslType, ok := typeMap[wgslTypeName]
+		if !ok {
+			return Struct{}, fmt.Errorf("unhandled WGSL type: %q", wgslTypeName)
 		}
 		s.Fields = append(s.Fields, field.Name)
 		s.FieldMap[field.Name] = Field{
@@ -85,6 +107,16 @@ func NewStruct[T any](name string) (Struct, error) {
 		}
 	}
 	return s, nil
+}
+
+func (s Struct) String() string {
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("struct %q, size %d\n", s.Name, s.Size))
+	for idx, fName := range s.Fields {
+		f := s.FieldMap[fName]
+		output.WriteString(fmt.Sprintf("  %d: %s at offset %d\n", idx, f.Name, f.Offset))
+	}
+	return output.String()
 }
 
 // ToWGSL returns a string representing the Go struct as a WGSL struct definition.
