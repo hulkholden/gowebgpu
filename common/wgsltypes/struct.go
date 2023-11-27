@@ -99,6 +99,11 @@ func NewStruct[T any](name string) (Struct, error) {
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled WGSL type: %q", wgslTypeName)
 		}
+
+		if err := validateOffset(field, wgslType); err != nil {
+			return Struct{}, err
+		}
+
 		s.Fields = append(s.Fields, field.Name)
 		s.FieldMap[field.Name] = Field{
 			Name:     field.Name,
@@ -107,6 +112,14 @@ func NewStruct[T any](name string) (Struct, error) {
 		}
 	}
 	return s, nil
+}
+
+// TODO: add test coverage for this.
+func validateOffset(field reflect.StructField, wgslType Type) error {
+	if (field.Offset % uintptr(wgslType.AlignOf)) != 0 {
+		return fmt.Errorf("incompatible offset for field %q: Go offset is %d but wgsl requires aligment of %d bytes for fields of type %q", field.Name, field.Offset, wgslType.AlignOf, wgslType.Name)
+	}
+	return nil
 }
 
 func (s Struct) String() string {
