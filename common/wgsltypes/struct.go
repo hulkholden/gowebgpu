@@ -9,6 +9,8 @@ import (
 var goToWGSLTypeMap = map[string]wgslType{
 	// Builtin types.
 	"float32": {Name: "f32"},
+	"int32":   {Name: "i32"},
+	"uint32":  {Name: "u32"},
 	// Custom types.
 	"github.com/hulkholden/gowebgpu/common/vmath.V2": {Name: "vec2<f32>"},
 	"github.com/hulkholden/gowebgpu/common/vmath.V3": {Name: "vec3<f32>"},

@@ -8,11 +8,12 @@ import (
 )
 
 type testStruct struct {
-	foo  float32
-	vec2 vmath.V2
-	vec3 vmath.V3
-	vec4 vmath.V4
-	bar  float32
+	f32Val    float32
+	int32Val  int32
+	uint32Val uint32
+	vec2      vmath.V2
+	vec3      vmath.V3
+	vec4      vmath.V4
 }
 
 func TestNewStruct(t *testing.T) {
@@ -22,42 +23,49 @@ func TestNewStruct(t *testing.T) {
 	}
 	want := Struct{
 		Name:   "testStruct",
-		Size:   44,
-		Fields: []string{"foo", "vec2", "vec3", "vec4", "bar"},
+		Size:   48,
+		Fields: []string{"f32Val", "int32Val", "uint32Val", "vec2", "vec3", "vec4"},
 		FieldMap: map[string]Field{
-			"foo": {
-				Name:   "foo",
+			"f32Val": {
+				Name:   "f32Val",
 				Offset: 0,
 				WGSLType: wgslType{
 					Name: "f32",
 				},
 			},
+			"int32Val": {
+				Name:   "int32Val",
+				Offset: 4,
+				WGSLType: wgslType{
+					Name: "i32",
+				},
+			},
+			"uint32Val": {
+				Name:   "uint32Val",
+				Offset: 8,
+				WGSLType: wgslType{
+					Name: "u32",
+				},
+			},
 			"vec2": {
 				Name:   "vec2",
-				Offset: 4,
+				Offset: 12,
 				WGSLType: wgslType{
 					Name: "vec2<f32>",
 				},
 			},
 			"vec3": {
 				Name:   "vec3",
-				Offset: 12,
+				Offset: 20,
 				WGSLType: wgslType{
 					Name: "vec3<f32>",
 				},
 			},
 			"vec4": {
 				Name:   "vec4",
-				Offset: 24,
+				Offset: 32,
 				WGSLType: wgslType{
 					Name: "vec4<f32>",
-				},
-			},
-			"bar": {
-				Name:   "bar",
-				Offset: 40,
-				WGSLType: wgslType{
-					Name: "f32",
 				},
 			},
 		},
@@ -75,11 +83,12 @@ func TestToWGSL(t *testing.T) {
 
 	got := s.ToWGSL()
 	want := `struct testStruct {
-  foo : f32,
+  f32Val : f32,
+  int32Val : i32,
+  uint32Val : u32,
   vec2 : vec2<f32>,
   vec3 : vec3<f32>,
   vec4 : vec4<f32>,
-  bar : f32,
 }
 `
 	if diff := cmp.Diff(want, got); diff != "" {
