@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "battle",
+    srcs = ["battle.go"],
+    embedsrcs = [
+        "compute.wgsl",
+        "render.wgsl",
+    ],
+    importpath = "github.com/hulkholden/gowebgpu/client/examples/battle",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//client/engine:engine_lib",
+        "//common/vmath",
+        "//common/wgsltypes",
+        "@com_github_mokiat_gog//opt",
+        "@com_github_mokiat_wasmgpu//:wasmgpu",
+    ],
+)

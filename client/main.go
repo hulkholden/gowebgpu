@@ -5,7 +5,7 @@ import (
 	"syscall/js"
 	"time"
 
-	"github.com/hulkholden/gowebgpu/client/examples/boids"
+	"github.com/hulkholden/gowebgpu/client/examples/battle"
 	"github.com/mokiat/wasmgpu"
 )
 
@@ -31,7 +31,7 @@ func main() {
 	context := wasmgpu.NewCanvasContext(jsContext)
 	device := wasmgpu.NewDevice(jsDevice)
 
-	if err := boids.Run(device, context); err != nil {
+	if err := battle.Run(device, context); err != nil {
 		log.Printf("runRender() failed: %v", err)
 	}
 
