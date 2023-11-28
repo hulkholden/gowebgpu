@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
@@ -8,15 +10,21 @@ import (
 
 var vertexFormatTypeMap = map[wgsltypes.TypeName]wasmgpu.GPUVertexFormat{
 	"f32":       wasmgpu.GPUVertexFormatFloat32,
+	"i32":       wasmgpu.GPUVertexFormatSint32,
+	"u32":       wasmgpu.GPUVertexFormatUint32,
 	"vec2<f32>": wasmgpu.GPUVertexFormatFloat32x2,
 	"vec3<f32>": wasmgpu.GPUVertexFormatFloat32x3,
 	"vec4<f32>": wasmgpu.GPUVertexFormatFloat32x4,
 }
 
 func makeGPUVertexAttribute(shaderLocation int, s wgsltypes.Struct, fieldName string) wasmgpu.GPUVertexAttribute {
+	field, ok := s.FieldMap[fieldName]
+	if !ok {
+		panic(fmt.Sprintf("field %s.%s does not exist", s.Name, fieldName))
+	}
 	return wasmgpu.GPUVertexAttribute{
 		ShaderLocation: wasmgpu.GPUIndex32(shaderLocation),
-		Format:         mustFormatFromFieldType(s.FieldMap[fieldName].WGSLType.Name),
+		Format:         mustFormatFromFieldType(field.WGSLType.Name),
 		Offset:         wasmgpu.GPUSize64(s.MustOffsetOf(fieldName)),
 	}
 }
