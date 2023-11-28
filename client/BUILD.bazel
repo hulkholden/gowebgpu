@@ -10,20 +10,11 @@ go_binary(
 
 go_library(
     name = "client_lib",
-    srcs = [
-        "main.go",
-        "storage_buffer.go",
-        "types.go",
-        "uniform_buffer.go",
-        "wasmgpu_helpers.go",
-    ],
+    srcs = ["main.go"],
     importpath = "github.com/hulkholden/gowebgpu/client",
     visibility = ["//visibility:private"],
     deps = [
-        "//client/browser",
-        "//common/vmath",
-        "//common/wgsltypes",
-        "@com_github_mokiat_gog//opt",
+        "//client/examples/boids",
         "@com_github_mokiat_wasmgpu//:wasmgpu",
     ],
 )

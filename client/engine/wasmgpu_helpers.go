@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"github.com/hulkholden/gowebgpu/common/wgsltypes"
@@ -29,7 +29,7 @@ func mustFormatFromFieldType(fieldType wgsltypes.TypeName) wasmgpu.GPUVertexForm
 	return format
 }
 
-func makeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmgpu.GPUBindGroupEntry {
+func MakeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmgpu.GPUBindGroupEntry {
 	entries := make([]wasmgpu.GPUBindGroupEntry, len(resources))
 	for idx, resource := range resources {
 		entries[idx] = wasmgpu.GPUBindGroupEntry{
@@ -56,7 +56,7 @@ type VertexBuffers struct {
 	Buffers []wasmgpu.GPUBuffer
 }
 
-func newVertexBuffers(bufDefs []BufferDescriptor, vtxAttrs []VertexAttribute) *VertexBuffers {
+func NewVertexBuffers(bufDefs []BufferDescriptor, vtxAttrs []VertexAttribute) *VertexBuffers {
 	result := make([]wasmgpu.GPUVertexBufferLayout, len(bufDefs))
 	for idx, bd := range bufDefs {
 		stepMode := wasmgpu.GPUVertexStepModeVertex

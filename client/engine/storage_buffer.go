@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"syscall/js"
@@ -12,7 +12,7 @@ type StorageBuffer struct {
 	buffer wasmgpu.GPUBuffer
 }
 
-func initStorageBuffer[T any](device wasmgpu.GPUDevice, values []T) StorageBuffer {
+func InitStorageBuffer[T any](device wasmgpu.GPUDevice, values []T) StorageBuffer {
 	// TODO: use Struct?
 	byteLen := int(unsafe.Sizeof(values[0])) * len(values)
 	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
@@ -26,4 +26,8 @@ func initStorageBuffer[T any](device wasmgpu.GPUDevice, values []T) StorageBuffe
 	return StorageBuffer{
 		buffer: buffer,
 	}
+}
+
+func (b StorageBuffer) Buffer() wasmgpu.GPUBuffer {
+	return b.buffer
 }

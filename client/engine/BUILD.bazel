@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "engine_lib",
+    srcs = [
+        "engine.go",
+        "storage_buffer.go",
+        "types.go",
+        "uniform_buffer.go",
+        "wasmgpu_helpers.go",
+    ],
+    importpath = "github.com/hulkholden/gowebgpu/client/engine",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//client/browser",
+        "//common/wgsltypes",
+        "@com_github_mokiat_gog//opt",
+        "@com_github_mokiat_wasmgpu//:wasmgpu",
+    ],
+)

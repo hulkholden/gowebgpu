@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"unsafe"
@@ -11,7 +11,7 @@ type UniformBuffer struct {
 	buffer wasmgpu.GPUBuffer
 }
 
-func initUniformBuffer[T any](device wasmgpu.GPUDevice, values T) UniformBuffer {
+func InitUniformBuffer[T any](device wasmgpu.GPUDevice, values T) UniformBuffer {
 	byteLen := unsafe.Sizeof(values)
 	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
 		Size:  wasmgpu.GPUSize64(byteLen),
@@ -28,4 +28,8 @@ func initUniformBuffer[T any](device wasmgpu.GPUDevice, values T) UniformBuffer 
 
 func (b UniformBuffer) updateBuffer(bytes []byte) {
 	b.device.Queue().WriteBuffer(b.buffer, 0, bytes)
+}
+
+func (b UniformBuffer) Buffer() wasmgpu.GPUBuffer {
+	return b.buffer
 }
