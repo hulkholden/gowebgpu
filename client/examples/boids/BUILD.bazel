@@ -3,6 +3,10 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "boids",
     srcs = ["boids.go"],
+    embedsrcs = [
+        "compute.wgsl",
+        "render.wgsl",
+    ],
     importpath = "github.com/hulkholden/gowebgpu/client/examples/boids",
     visibility = ["//visibility:public"],
     deps = [

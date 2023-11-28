@@ -1,7 +1,6 @@
 package boids
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/hulkholden/gowebgpu/client/engine"
@@ -9,6 +8,8 @@ import (
 	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
+
+	_ "embed"
 )
 
 const numParticles = 20000
@@ -38,6 +39,12 @@ var (
 	vertexStruct    = wgsltypes.MustNewStruct[Vertex]("Vertex")
 )
 
+//go:embed compute.wgsl
+var computeShaderCode string
+
+//go:embed render.wgsl
+var renderShaderCode string
+
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	simParams := SimParams{
@@ -66,11 +73,6 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		engine.InitStorageBuffer(device, initialParticleData),
 	}
 
-	spriteShaderModule, err := engine.LoadShaderModule(device, "/static/shaders/render.wgsl", nil)
-	if err != nil {
-		return fmt.Errorf("loading shader: %v", err)
-	}
-
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const particleBufferIdx = 0
 	const vertexBufferIdx = 1
@@ -86,6 +88,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	vertexBuffers := engine.NewVertexBuffers(bufDefs, vtxAttrs)
 
+	spriteShaderModule := engine.InitShaderModule(device, renderShaderCode, nil)
 	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
 		// Layout: "auto",
 		Vertex: wasmgpu.GPUVertexState{
@@ -115,11 +118,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 
 	// Compute
-	updateSpritesShaderModule, err := engine.LoadShaderModule(device, "/static/shaders/compute.wgsl", structDefinitions)
-	if err != nil {
-		return fmt.Errorf("loading shader: %v", err)
-	}
-
+	updateSpritesShaderModule := engine.InitShaderModule(device, computeShaderCode, structDefinitions)
 	computePipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{

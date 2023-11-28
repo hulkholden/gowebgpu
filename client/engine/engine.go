@@ -26,7 +26,10 @@ func LoadShaderModule(device wasmgpu.GPUDevice, url string, structs []wgsltypes.
 	if err != nil {
 		return wasmgpu.GPUShaderModule{}, fmt.Errorf("loading shader: %v", err)
 	}
+	return InitShaderModule(device, string(bytes), structs), nil
+}
 
+func InitShaderModule(device wasmgpu.GPUDevice, code string, structs []wgsltypes.Struct) wasmgpu.GPUShaderModule {
 	defs := make([]string, len(structs))
 	for i, s := range structs {
 		defs[i] = s.ToWGSL()
@@ -34,8 +37,8 @@ func LoadShaderModule(device wasmgpu.GPUDevice, url string, structs []wgsltypes.
 	prologue := strings.Join(defs, "\n")
 
 	return device.CreateShaderModule(wasmgpu.GPUShaderModuleDescriptor{
-		Code: prologue + "\n" + string(bytes),
-	}), nil
+		Code: prologue + "\n" + code,
+	})
 }
 
 func loadFile(url string) ([]byte, error) {

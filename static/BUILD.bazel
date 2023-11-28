@@ -14,8 +14,6 @@ go_library(
         "style.css",
         "style.scss",
         "wasm_exec.js",
-        "shaders/compute.wgsl",
-        "shaders/render.wgsl",
     ],
     importpath = "github.com/hulkholden/gowebgpu/static",
     visibility = ["//visibility:public"],
