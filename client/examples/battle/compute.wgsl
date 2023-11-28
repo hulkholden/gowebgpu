@@ -18,23 +18,26 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   var cMassCount = 0u;
   var cVelCount = 0u;
 
+  let myTeam = particlesA.particles[index].team;
+
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
     if (i == index) {
       continue;
     }
+    let same = particlesA.particles[i].team == myTeam;
 
     let pos = particlesA.particles[i].pos.xy;
     let vel = particlesA.particles[i].vel.xy;
     let dPos = pos - vPos;
     let dist = length(dPos);
-    if (dist < params.rule1Distance) {
+    if (same && dist < params.rule1Distance) {
       cMass += pos;
       cMassCount++;
     }
     if (dist < params.rule2Distance) {
       colVel -= dPos;
     }
-    if (dist < params.rule3Distance) {
+    if (same && dist < params.rule3Distance) {
       cVel += vel;
       cVelCount++;
     }

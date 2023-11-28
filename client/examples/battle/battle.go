@@ -12,7 +12,21 @@ import (
 	_ "embed"
 )
 
-const numParticles = 20000
+const (
+	numParticles = 20000
+	numTeams     = 3
+)
+
+type ARGB uint32
+
+const (
+	NiceRed    ARGB = 0xfffc0335
+	NiceBlue   ARGB = 0xff035efc
+	NiceOrange ARGB = 0xfffc8803
+	NicePurple ARGB = 0xff891cb8
+
+	Magenta = 0xffff00ff
+)
 
 type SimParams struct {
 	deltaT        float32
@@ -25,8 +39,10 @@ type SimParams struct {
 }
 
 type Particle struct {
-	pos vmath.V2
-	vel vmath.V2
+	pos  vmath.V2
+	vel  vmath.V2
+	col  uint32
+	team uint32
 }
 
 type Vertex struct {
@@ -84,6 +100,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	vtxAttrs := []engine.VertexAttribute{
 		{BufferIndex: particleBufferIdx, FieldName: "pos"},
 		{BufferIndex: particleBufferIdx, FieldName: "vel"},
+		{BufferIndex: particleBufferIdx, FieldName: "col"},
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
 	vertexBuffers := engine.NewVertexBuffers(bufDefs, vtxAttrs)
@@ -195,6 +212,20 @@ func initParticleData(n int) []Particle {
 		data[i].pos.Y = 2 * (rand.Float32() - 0.5)
 		data[i].vel.X = 2 * (rand.Float32() - 0.5) * 0.1
 		data[i].vel.Y = 2 * (rand.Float32() - 0.5) * 0.1
+
+		data[i].team = rand.Uint32() % numTeams
+		switch data[i].team {
+		case 0:
+			data[i].col = uint32(NiceRed)
+		case 1:
+			data[i].col = uint32(NicePurple)
+		case 2:
+			data[i].col = uint32(NiceBlue)
+		case 3:
+			data[i].col = uint32(NiceOrange)
+		default:
+			data[i].col = Magenta
+		}
 	}
 	return data
 }
