@@ -8,23 +8,43 @@ struct Particles {
 const minBound = vec2f(-1.0);
 const maxBound = vec2f(1.0);
 
-// https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  var index = GlobalInvocationID.x;
+  let index = GlobalInvocationID.x;
+  let particle = particlesA.particles[index];
 
-  var vPos = particlesA.particles[index].pos;
-  var vVel = particlesA.particles[index].vel;
+  var vPos = particle.pos;
+  var vVel = particle.vel;
+
+  vVel = flock(particle, index);
+
+  // kinematic update
+  vPos = vPos + (vVel * params.deltaT);
+
+  // Bounce off the boundary.
+  let under = (vPos < minBound) & (vVel < vec2());
+  let over = (vPos > maxBound) & (vVel > vec2());
+  vVel = select(vVel, -vVel * params.boundaryBounceFactor, under | over);
+  vPos = clamp(vPos, minBound, maxBound);
+
+  // Write back
+  particlesB.particles[index].pos = vPos;
+  particlesB.particles[index].vel = vVel;
+}
+
+fn flock(particle : Particle, selfIdx : u32) -> vec2f {
+  var vPos = particle.pos;
+  var vVel = particle.vel;
   var cMass = vec2(0.0);
   var cVel = vec2(0.0);
   var colVel = vec2(0.0);
   var cMassCount = 0u;
   var cVelCount = 0u;
 
-  let myTeam = particlesA.particles[index].team;
+  let myTeam = particle.team;
 
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
-    if (i == index) {
+    if (i == selfIdx) {
       continue;
     }
     let same = particlesA.particles[i].team == myTeam;
@@ -56,18 +76,5 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   vVel += (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
 
   // clamp velocity for a more pleasing simulation
-  vVel = normalize(vVel) * clamp(length(vVel), 0.0, 0.1);
-
-  // kinematic update
-  vPos = vPos + (vVel * params.deltaT);
-
-  // Bounce off the boundary.
-  let under = (vPos < minBound) & (vVel < vec2());
-  let over = (vPos > maxBound) & (vVel > vec2());
-  vVel = select(vVel, -vVel * params.boundaryBounceFactor, under | over);
-  vPos = clamp(vPos, minBound, maxBound);
-
-  // Write back
-  particlesB.particles[index].pos = vPos;
-  particlesB.particles[index].vel = vVel;
+  return normalize(vVel) * clamp(length(vVel), 0.0, 0.1);
 }
