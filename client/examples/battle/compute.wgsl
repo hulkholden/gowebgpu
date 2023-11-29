@@ -13,23 +13,28 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let index = GlobalInvocationID.x;
   let particle = particlesA.particles[index];
 
-  var vPos = particle.pos;
-  var vVel = particle.vel;
+  var pos = particle.pos;
+  var vel = particle.vel;
+  var angle = particle.angle;
+  var angularVel = particle.angularVel;
 
-  vVel = flock(particle, index);
+  vel = flock(particle, index);
+  angle = select(0, -atan2(vel.x, vel.y), length(vel) > 0);
 
   // kinematic update
-  vPos = vPos + (vVel * params.deltaT);
+  pos += (vel * params.deltaT);
+  angle += (angularVel * params.deltaT);
 
   // Bounce off the boundary.
-  let under = (vPos < minBound) & (vVel < vec2());
-  let over = (vPos > maxBound) & (vVel > vec2());
-  vVel = select(vVel, -vVel * params.boundaryBounceFactor, under | over);
-  vPos = clamp(vPos, minBound, maxBound);
+  let under = (pos < minBound) & (vel < vec2());
+  let over = (pos > maxBound) & (vel > vec2());
+  vel = select(vel, -vel * params.boundaryBounceFactor, under | over);
+  pos = clamp(pos, minBound, maxBound);
 
   // Write back
-  particlesB.particles[index].pos = vPos;
-  particlesB.particles[index].vel = vVel;
+  particlesB.particles[index].pos = pos;
+  particlesB.particles[index].vel = vel;
+  particlesB.particles[index].angle = angle;
 }
 
 fn flock(particle : Particle, selfIdx : u32) -> vec2f {

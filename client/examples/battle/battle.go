@@ -42,10 +42,12 @@ type SimParams struct {
 }
 
 type Particle struct {
-	pos  vmath.V2
-	vel  vmath.V2
-	col  uint32
-	team uint32
+	pos        vmath.V2
+	vel        vmath.V2
+	angle      float32
+	angularVel float32
+	col        uint32
+	team       uint32
 }
 
 type Vertex struct {
@@ -103,7 +105,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	vtxAttrs := []engine.VertexAttribute{
 		{BufferIndex: particleBufferIdx, FieldName: "pos"},
-		{BufferIndex: particleBufferIdx, FieldName: "vel"},
+		{BufferIndex: particleBufferIdx, FieldName: "angle"},
 		{BufferIndex: particleBufferIdx, FieldName: "col"},
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
@@ -216,6 +218,8 @@ func initParticleData(n int) []Particle {
 		data[i].pos.Y = 2 * (rand.Float32() - 0.5)
 		data[i].vel.X = 2 * (rand.Float32() - 0.5) * 0.1
 		data[i].vel.Y = 2 * (rand.Float32() - 0.5) * 0.1
+		data[i].angle = (rand.Float32() - 0.5) * 3.141 * 2
+		data[i].angularVel = (rand.Float32() - 0.5) * 1
 
 		data[i].team = rand.Uint32() % numTeams
 		switch data[i].team {
