@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	numParticles = 20000
+	numParticles = 1000
 	numTeams     = 3
 )
 
@@ -36,6 +36,9 @@ type SimParams struct {
 	cMassScale    float32
 	avoidScale    float32
 	cVelScale     float32
+
+	// boundaryBounceFactor is the velocity preserved after colliding with the boundary.
+	boundaryBounceFactor float32
 }
 
 type Particle struct {
@@ -64,13 +67,14 @@ var renderShaderCode string
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	simParams := SimParams{
-		deltaT:        0.04,
-		avoidDistance: 0.025,
-		cMassDistance: 0.1,
-		cVelDistance:  0.025,
-		cMassScale:    0.02,
-		avoidScale:    0.05,
-		cVelScale:     0.005,
+		deltaT:               0.04,
+		avoidDistance:        0.025,
+		cMassDistance:        0.1,
+		cVelDistance:         0.025,
+		cMassScale:           0.02,
+		avoidScale:           0.05,
+		cVelScale:            0.005,
+		boundaryBounceFactor: 0.95,
 	}
 	simParamBuffer := engine.InitUniformBuffer(device, simParams)
 	// TODO: add sim params to GUI.

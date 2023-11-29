@@ -5,6 +5,9 @@ struct Particles {
 @binding(1) @group(0) var<storage, read> particlesA : Particles;
 @binding(2) @group(0) var<storage, read_write> particlesB : Particles;
 
+const minBound = vec2f(-1.0);
+const maxBound = vec2f(1.0);
+
 // https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -54,21 +57,15 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   // clamp velocity for a more pleasing simulation
   vVel = normalize(vVel) * clamp(length(vVel), 0.0, 0.1);
+
   // kinematic update
   vPos = vPos + (vVel * params.deltaT);
-  // Wrap around boundary
-  if (vPos.x < -1.0) {
-    vPos.x += 2.0;
-  }
-  if (vPos.x > 1.0) {
-    vPos.x -= -2.0;
-  }
-  if (vPos.y < -1.0) {
-    vPos.y += 2.0;
-  }
-  if (vPos.y > 1.0) {
-    vPos.y -= -2.0;
-  }
+
+  // Bounce off the boundary.
+  let under = (vPos < minBound) & (vVel < vec2());
+  let over = (vPos > maxBound) & (vVel > vec2());
+  vVel = select(vVel, -vVel * params.boundaryBounceFactor, under | over);
+  vPos = clamp(vPos, minBound, maxBound);
 
   // Write back
   particlesB.particles[index].pos = vPos;
