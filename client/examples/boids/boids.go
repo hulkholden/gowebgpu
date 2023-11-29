@@ -16,12 +16,12 @@ const numParticles = 20000
 
 type SimParams struct {
 	deltaT        float32
-	rule1Distance float32
-	rule2Distance float32
-	rule3Distance float32
-	rule1Scale    float32
-	rule2Scale    float32
-	rule3Scale    float32
+	avoidDistance float32
+	cMassDistance float32
+	cVelDistance  float32
+	avoidScale    float32
+	cMassScale    float32
+	cVelScale     float32
 }
 
 type Particle struct {
@@ -49,12 +49,12 @@ var renderShaderCode string
 func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	simParams := SimParams{
 		deltaT:        0.04,
-		rule1Distance: 0.1,
-		rule2Distance: 0.025,
-		rule3Distance: 0.025,
-		rule1Scale:    0.02,
-		rule2Scale:    0.05,
-		rule3Scale:    0.005,
+		avoidDistance: 0.025,
+		cMassDistance: 0.1,
+		cVelDistance:  0.025,
+		avoidScale:    0.05,
+		cMassScale:    0.02,
+		cVelScale:     0.005,
 	}
 	simParamBuffer := engine.InitUniformBuffer(device, simParams)
 	// TODO: add sim params to GUI.
