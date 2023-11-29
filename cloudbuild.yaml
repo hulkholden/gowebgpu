@@ -1,0 +1,29 @@
+timeout: '600s'
+
+steps:
+- id: 'Bazel build'
+  name: 'gcr.io/cloud-builders/bazel:6.2.1'
+  args: ['build', '//:gowebgpu_tarball']
+
+- id: 'Create symlink'
+  name: 'gcr.io/cloud-builders/bazel:6.2.1'
+  entrypoint: '/bin/bash'
+  args: 
+  - -ceux
+  - |
+    # Keep track of where the binary is located.
+    echo $(bazel cquery --output=files //:gowebgpu_tarball) > /workspace/output.txt
+
+- id: 'Docker load'
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: '/bin/bash'
+  args:
+  - -ceux
+  - |
+    docker load --input $(cat /workspace/output.txt)
+
+- id: 'Docker tag'
+  name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'gowebgpu:latest', '$LOCATION-docker.pkg.dev/$PROJECT_ID/hulkholden-dev/gowebgpu:$TAG_NAME']
+images:
+- '$LOCATION-docker.pkg.dev/$PROJECT_ID/hulkholden-dev/gowebgpu:$TAG_NAME'
