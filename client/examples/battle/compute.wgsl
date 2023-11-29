@@ -30,16 +30,18 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     let vel = particlesA.particles[i].vel.xy;
     let dPos = pos - vPos;
     let dist = length(dPos);
-    if (same && dist < params.cMassDistance) {
-      cMass += pos;
-      cMassCount++;
-    }
     if (dist < params.avoidDistance) {
       colVel -= dPos;
     }
-    if (same && dist < params.cVelDistance) {
-      cVel += vel;
-      cVelCount++;
+    if (same) {
+      if (dist < params.cMassDistance) {
+        cMass += pos;
+        cMassCount++;
+      }
+      if (dist < params.cVelDistance) {
+        cVel += vel;
+        cVelCount++;
+      }
     }
   }
   if (cMassCount > 0) {
@@ -48,7 +50,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   if (cVelCount > 0) {
     cVel /= f32(cVelCount);
   }
-  vVel += (cMass * params.cMassScale) + (colVel * params.avoidScale) + (cVel * params.cVelScale);
+  vVel += (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
 
   // clamp velocity for a more pleasing simulation
   vVel = normalize(vVel) * clamp(length(vVel), 0.0, 0.1);
