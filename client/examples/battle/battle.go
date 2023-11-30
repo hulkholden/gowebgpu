@@ -24,8 +24,7 @@ const (
 	NiceBlue   ARGB = 0xff035efc
 	NiceOrange ARGB = 0xfffc8803
 	NicePurple ARGB = 0xff891cb8
-
-	Magenta = 0xffff00ff
+	Magenta    ARGB = 0xffff00ff
 )
 
 type SimParams struct {
@@ -47,7 +46,36 @@ type Particle struct {
 	angle      float32
 	angularVel float32
 	col        uint32
-	team       uint32
+	metadata   uint32
+}
+
+type Team uint8
+
+var teamColMap = map[Team]ARGB{
+	0: NiceRed,
+	1: NicePurple,
+	2: NiceBlue,
+	3: NiceOrange,
+}
+
+func (t Team) Color() ARGB {
+	if col, ok := teamColMap[t]; ok {
+		return col
+	}
+	return Magenta
+}
+
+type BodyType uint8
+
+// TODO: need a way to expose this to the shader.
+const (
+	BodyTypeNone BodyType = iota
+	BodyTypeShip
+	BodyTypeMissile
+)
+
+func makeMeta(bodyType BodyType, team Team) uint32 {
+	return uint32(bodyType)<<8 | uint32(team)
 }
 
 type Vertex struct {
@@ -221,19 +249,10 @@ func initParticleData(n int) []Particle {
 		data[i].angle = (rand.Float32() - 0.5) * 3.141 * 2
 		data[i].angularVel = (rand.Float32() - 0.5) * 1
 
-		data[i].team = rand.Uint32() % numTeams
-		switch data[i].team {
-		case 0:
-			data[i].col = uint32(NiceRed)
-		case 1:
-			data[i].col = uint32(NicePurple)
-		case 2:
-			data[i].col = uint32(NiceBlue)
-		case 3:
-			data[i].col = uint32(NiceOrange)
-		default:
-			data[i].col = Magenta
-		}
+		bodyType := BodyTypeShip
+		team := Team(rand.Uint32() % numTeams)
+		data[i].metadata = makeMeta(bodyType, team)
+		data[i].col = uint32(team.Color())
 	}
 	return data
 }

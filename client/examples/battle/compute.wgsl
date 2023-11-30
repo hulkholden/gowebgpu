@@ -8,6 +8,10 @@ struct Particles {
 const minBound = vec2f(-1.0);
 const maxBound = vec2f(1.0);
 
+const bodyTypeNone = 0u;
+const bodyTypeShip = 1u;
+const bodyTypeMissile = 2u;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let index = GlobalInvocationID.x;
@@ -18,8 +22,18 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   var angle = particle.angle;
   var angularVel = particle.angularVel;
 
-  vel = flock(particle, index);
-  angle = select(0, -atan2(vel.x, vel.y), length(vel) > 0);
+  switch particleType(particle) {
+    case bodyTypeNone: {
+    }
+    case bodyTypeShip: {
+      vel = flock(particle, index);
+      angle = select(0, -atan2(vel.x, vel.y), length(vel) > 0);
+    }
+    case bodyTypeMissile: {
+    }
+    default: {
+    }
+  }
 
   // kinematic update
   pos += (vel * params.deltaT);
@@ -37,6 +51,14 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   particlesB.particles[index].angle = angle;
 }
 
+fn particleType(particle : Particle) -> u32 {
+  return (particle.metadata >> 8) & 0xff;
+}
+
+fn particleTeam(particle : Particle) -> u32 {
+  return particle.metadata & 0xff;
+}
+
 fn flock(particle : Particle, selfIdx : u32) -> vec2f {
   var vPos = particle.pos;
   var vVel = particle.vel;
@@ -46,13 +68,13 @@ fn flock(particle : Particle, selfIdx : u32) -> vec2f {
   var cMassCount = 0u;
   var cVelCount = 0u;
 
-  let myTeam = particle.team;
+  let myTeam = particleTeam(particle);
 
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
     if (i == selfIdx) {
       continue;
     }
-    let same = particlesA.particles[i].team == myTeam;
+    let same = particleTeam(particlesA.particles[i]) == myTeam;
 
     let pos = particlesA.particles[i].pos.xy;
     let vel = particlesA.particles[i].vel.xy;
