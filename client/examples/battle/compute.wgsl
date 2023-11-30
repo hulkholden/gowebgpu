@@ -71,19 +71,18 @@ fn flock(particle : Particle, selfIdx : u32) -> vec2f {
   let myTeam = particleTeam(particle);
 
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
-    if (i == selfIdx) {
+    let other = particlesA.particles[i];
+    if (i == selfIdx || particleType(other) != bodyTypeShip) {
       continue;
     }
-    let same = particleTeam(particlesA.particles[i]) == myTeam;
-
-    let pos = particlesA.particles[i].pos.xy;
-    let vel = particlesA.particles[i].vel.xy;
+    let pos = other.pos.xy;
+    let vel = other.vel.xy;
     let dPos = pos - vPos;
     let dist = length(dPos);
     if (dist < params.avoidDistance) {
       colVel -= dPos;
     }
-    if (same) {
+    if (particleTeam(other) == myTeam) {
       if (dist < params.cMassDistance) {
         cMass += pos;
         cMassCount++;
