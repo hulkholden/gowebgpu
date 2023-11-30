@@ -8,6 +8,7 @@ import (
 	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
+	"github.com/mroth/weightedrand/v2"
 
 	_ "embed"
 )
@@ -240,19 +241,29 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 }
 
 func initParticleData(n int) []Particle {
+	type particleChoice struct {
+		bodyType BodyType
+		team     Team
+	}
+
+	chooser, _ := weightedrand.NewChooser(
+		weightedrand.NewChoice(particleChoice{BodyTypeShip, 0}, 8),
+		weightedrand.NewChoice(particleChoice{BodyTypeShip, 1}, 1),
+		weightedrand.NewChoice(particleChoice{BodyTypeShip, 2}, 1),
+	)
+
 	data := make([]Particle, n)
 	for i := 0; i < n; i++ {
 		data[i].pos.X = 2 * (rand.Float32() - 0.5)
 		data[i].pos.Y = 2 * (rand.Float32() - 0.5)
 		data[i].vel.X = 2 * (rand.Float32() - 0.5) * 0.1
 		data[i].vel.Y = 2 * (rand.Float32() - 0.5) * 0.1
-		data[i].angle = (rand.Float32() - 0.5) * 3.141 * 2
+		data[i].angle = 2 * (rand.Float32() - 0.5) * 3.141
 		data[i].angularVel = (rand.Float32() - 0.5) * 1
 
-		bodyType := BodyTypeShip
-		team := Team(rand.Uint32() % numTeams)
-		data[i].metadata = makeMeta(bodyType, team)
-		data[i].col = uint32(team.Color())
+		choice := chooser.Pick()
+		data[i].metadata = makeMeta(choice.bodyType, choice.team)
+		data[i].col = uint32(choice.team.Color())
 	}
 	return data
 }

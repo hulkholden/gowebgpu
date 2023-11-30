@@ -15,5 +15,6 @@ go_library(
         "//common/wgsltypes",
         "@com_github_mokiat_gog//opt",
         "@com_github_mokiat_wasmgpu//:wasmgpu",
+        "@com_github_mroth_weightedrand_v2//:weightedrand",
     ],
 )
