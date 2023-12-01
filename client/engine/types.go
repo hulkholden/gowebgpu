@@ -36,6 +36,16 @@ func structAsByteSlice[T any](data T) []byte {
 	return bytes
 }
 
+// ByteSliceAsStructSlice reinterprets the provided sturct as a byte[].
+func ByteSliceAsStructSlice[T any](data []byte) []T {
+	ptr := (*T)(unsafe.Pointer(&data[0]))
+	var zero T
+	l := uintptr(len(data)) / unsafe.Sizeof(zero)
+	s := unsafe.Slice(ptr, l)
+	runtime.KeepAlive(data)
+	return s
+}
+
 func setFloat32Array(f32arr js.Value, values []float32) {
 	// Ideally we could all something like: `f32arr.Call("set", vertexBufferData)`
 	// but the js only handles []any.
