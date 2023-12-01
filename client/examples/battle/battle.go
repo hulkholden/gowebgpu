@@ -55,6 +55,10 @@ type Particle struct {
 	col        uint32
 	metadata   uint32
 
+	targetIdx uint32
+	pad       uint32
+}
+
 func (p Particle) BodyType() BodyType {
 	return BodyType((p.metadata >> 8) & 0xff)
 }
@@ -284,6 +288,21 @@ func initParticleData(n int, params SimParams) []Particle {
 		choice := chooser.Pick()
 		data[i].metadata = makeMeta(choice.bodyType, choice.team)
 		data[i].col = uint32(choice.team.Color())
+		data[i].targetIdx = 0xffff_ffff
+	}
+
+	// Assign targets.
+	for i, pi := range data {
+		if data[i].BodyType() != BodyTypeMissile {
+			continue
+		}
+		for j, pj := range data {
+			if pj.BodyType() != BodyTypeShip || pj.Team() == pi.Team() {
+				continue
+			}
+			data[i].targetIdx = uint32(j)
+			break
+		}
 	}
 	return data
 }
