@@ -124,7 +124,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		minBound: vmath.NewV2(-1000, -1000),
 		maxBound: vmath.NewV2(+1000, +1000),
 
-		deltaT: 0.04,
+		deltaT: 1 / 50.0,
 
 		avoidDistance: 25.0,
 		cMassDistance: 100,
@@ -134,8 +134,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		avoidScale: 0.05,
 		cVelScale:  0.005,
 
-		maxSpeed:  0.4,
-		maxAcc:    0.01,
+		maxSpeed:  200.0,
+		maxAcc:    300.0,
 		maxAngAcc: 16.0,
 
 		boundaryBounceFactor: 0.95,
