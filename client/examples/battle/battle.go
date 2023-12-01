@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	numParticles = 1000
-	numTeams     = 3
+	numParticles = 4
 
 	initialVelScale = 100.0
 )
@@ -45,6 +44,12 @@ type SimParams struct {
 
 	// boundaryBounceFactor is the velocity preserved after colliding with the boundary.
 	boundaryBounceFactor float32
+
+	maxSpeed  float32
+	maxAcc    float32
+	maxAngAcc float32
+
+	pad uint32
 }
 
 type Particle struct {
@@ -128,6 +133,10 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		cMassScale: 0.02,
 		avoidScale: 0.05,
 		cVelScale:  0.005,
+
+		maxSpeed:  0.4,
+		maxAcc:    0.01,
+		maxAngAcc: 16.0,
 
 		boundaryBounceFactor: 0.95,
 	}
