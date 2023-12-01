@@ -54,6 +54,13 @@ type Particle struct {
 	angularVel float32
 	col        uint32
 	metadata   uint32
+
+func (p Particle) BodyType() BodyType {
+	return BodyType((p.metadata >> 8) & 0xff)
+}
+
+func (p Particle) Team() Team {
+	return Team(p.metadata & 0xff)
 }
 
 type Team uint8
