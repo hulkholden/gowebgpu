@@ -45,8 +45,8 @@ fn rotVec(v : vec2f, a : f32) -> vec2f {
   return v * transform;
 }
 
-fn angleOf(v : vec2f) -> f32 {
-  return atan2(-v.x, v.y);
+fn angleOf(v : vec2f, def : f32) -> f32 {
+  return select(def, atan2(-v.x, v.y), length(v) > 0);
 }
 
 fn angleDiff(a : f32, b : f32) -> f32 {
@@ -79,7 +79,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     }
     case bodyTypeShip: {
       f.vel = flock(particle, index);
-      f.angle = select(0, -atan2(f.vel.x, f.vel.y), length(f.vel) > 0);
+      f.angle = angleOf(f.vel, f.angle);
     }
     case bodyTypeMissile: {
       let control = updateMissile(f, index, particle.targetIdx);
@@ -185,8 +185,7 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
   let desiredDir = targetDir;
   let desiredDist = clamp(targetDist, 0.0, 0.0);      // TODO: this would be min/max distance
   let desiredPos = targetPos + desiredDir * desiredDist;
-  // FIXME: handle 0 len
-  let desiredAngle = angleOf(current.vel); // angleOf(-targetDir);   // TODO: for ships use -targetDir
+  let desiredAngle = angleOf(current.vel, current.angle); // angleOf(-targetDir);   // TODO: for ships use -targetDir  
   let desired = ReferenceFrame(desiredPos, targetVel, desiredAngle, 0.0);
 
   let rel = referenceFrameSub(desired, current);
