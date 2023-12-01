@@ -50,8 +50,11 @@ fn angleOf(v : vec2f) -> f32 {
 }
 
 fn angleDiff(a : f32, b : f32) -> f32 {
-  let diff = a - b;
-  var n = modReplacement(diff + pi, twoPi);
+  return normalizeAngle(a - b);
+}
+
+fn normalizeAngle(a : f32) -> f32 {
+  var n = modReplacement(a + pi, twoPi);
   if (n < 0) {
     n += twoPi;
   }
@@ -89,7 +92,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   // kinematic update
   f.pos += f.vel * params.deltaT;
-  f.angle += f.angularVel * params.deltaT;
+  f.angle = normalizeAngle(f.angle + f.angularVel * params.deltaT);
 
   // Bounce off the boundary.
   let under = (f.pos < params.minBound) & (f.vel < vec2());
