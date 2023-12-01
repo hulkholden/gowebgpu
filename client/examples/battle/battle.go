@@ -2,6 +2,7 @@ package battle
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/hulkholden/gowebgpu/client/engine"
 	"github.com/hulkholden/gowebgpu/common/vmath"
@@ -16,6 +17,8 @@ import (
 const (
 	numParticles = 1000
 	numTeams     = 3
+
+	initialVelScale = 100.0
 )
 
 type ARGB uint32
@@ -29,6 +32,9 @@ const (
 )
 
 type SimParams struct {
+	minBound vmath.V2
+	maxBound vmath.V2
+
 	deltaT        float32
 	avoidDistance float32
 	cMassDistance float32
@@ -98,27 +104,34 @@ var renderShaderCode string
 // https://webgpu.github.io/webgpu-samples/samples/computeBoids
 func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	simParams := SimParams{
-		deltaT:               0.04,
-		avoidDistance:        0.025,
-		cMassDistance:        0.1,
-		cVelDistance:         0.025,
-		cMassScale:           0.02,
-		avoidScale:           0.05,
-		cVelScale:            0.005,
+		// TODO: get from the canvas
+		minBound: vmath.NewV2(-1000, -1000),
+		maxBound: vmath.NewV2(+1000, +1000),
+
+		deltaT: 0.04,
+
+		avoidDistance: 25.0,
+		cMassDistance: 100,
+		cVelDistance:  25.0,
+
+		cMassScale: 0.02,
+		avoidScale: 0.05,
+		cVelScale:  0.005,
+
 		boundaryBounceFactor: 0.95,
 	}
 	simParamBuffer := engine.InitUniformBuffer(device, simParams)
 	// TODO: add sim params to GUI.
 
-	const boidScale = 0.5
+	const boidScale = 500
 	vertexBufferData := []float32{
 		-0.01 * boidScale, -0.02 * boidScale,
-		0.01 * boidScale, -0.02 * boidScale,
-		0.0 * boidScale, 0.02 * boidScale,
+		+0.01 * boidScale, -0.02 * boidScale,
+		+0.00 * boidScale, +0.02 * boidScale,
 	}
 	spriteVertexBuffer := engine.InitStorageBuffer(device, vertexBufferData)
 
-	initialParticleData := initParticleData(numParticles)
+	initialParticleData := initParticleData(numParticles, simParams)
 	particleBuffers := []engine.StorageBuffer{
 		engine.InitStorageBuffer(device, initialParticleData),
 		engine.InitStorageBuffer(device, initialParticleData),
@@ -240,7 +253,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initParticleData(n int) []Particle {
+func initParticleData(n int, params SimParams) []Particle {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+
 	type particleChoice struct {
 		bodyType BodyType
 		team     Team
@@ -254,10 +269,8 @@ func initParticleData(n int) []Particle {
 
 	data := make([]Particle, n)
 	for i := 0; i < n; i++ {
-		data[i].pos.X = 2 * (rand.Float32() - 0.5)
-		data[i].pos.Y = 2 * (rand.Float32() - 0.5)
-		data[i].vel.X = 2 * (rand.Float32() - 0.5) * 0.1
-		data[i].vel.Y = 2 * (rand.Float32() - 0.5) * 0.1
+		data[i].pos = randomLocation(r, params)
+		data[i].vel = randomVelocity(r)
 		data[i].angle = 2 * (rand.Float32() - 0.5) * 3.141
 		data[i].angularVel = (rand.Float32() - 0.5) * 1
 
@@ -266,4 +279,16 @@ func initParticleData(n int) []Particle {
 		data[i].col = uint32(choice.team.Color())
 	}
 	return data
+}
+
+func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {
+	x := (r.Float32() * (params.maxBound.X - params.minBound.X)) + params.minBound.X
+	y := (r.Float32() * (params.maxBound.Y - params.minBound.Y)) + params.minBound.Y
+	return vmath.NewV2(x, y)
+}
+
+func randomVelocity(r *rand.Rand) vmath.V2 {
+	x := 2 * (rand.Float32() - 0.5) * initialVelScale
+	y := 2 * (rand.Float32() - 0.5) * initialVelScale
+	return vmath.NewV2(x, y)
 }
