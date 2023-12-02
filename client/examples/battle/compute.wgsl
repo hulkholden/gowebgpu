@@ -171,22 +171,18 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
     return Control();
   }
 
-  var vPos = current.pos;
-  var vVel = current.vel;
   let targetP = particlesA.particles[targetIdx];
   let targetF = particleReferenceFrame(targetP);
 
-  let targetPos = targetF.pos;
-  let targetVel = targetF.vel;
-  let targetVec = current.pos - targetPos;
+  let targetVec = current.pos - targetF.pos;
   let targetDist = length(targetVec);
   let targetDir = normalize(targetVec);  // TODO: handle zero targetDist
 
   let desiredDir = targetDir;
   let desiredDist = clamp(targetDist, 0.0, 0.0);      // TODO: this would be min/max distance
-  let desiredPos = targetPos + desiredDir * desiredDist;
+  let desiredPos = targetF.pos + desiredDir * desiredDist;
   let desiredAngle = angleOf(current.vel, current.angle); // angleOf(-targetDir);   // TODO: for ships use -targetDir  
-  let desired = ReferenceFrame(desiredPos, targetVel, desiredAngle, 0.0);
+  let desired = ReferenceFrame(desiredPos, targetF.vel, desiredAngle, 0.0);
 
   let rel = referenceFrameSub(desired, current);
   // Transform into the missile's coordinate system.
