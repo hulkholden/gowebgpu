@@ -209,14 +209,13 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
   return Control(linAcc, angAcc);
 }
 
-fn proNav2D(relPos : vec2f, relVel : vec2f, forward : vec2f) -> vec2f {
-	// TODO: most of the math simplifies with z=0.
-	return proNav3D(vec3f(relPos, 0.0), vec3f(relVel, 0.0), vec3f(forward, 0.0)).xy;
+// A version of https://en.wikipedia.org/wiki/Proportional_navigation simplified for 2D.
+fn proNav2D(r : vec2f, v : vec2f) -> f32 {
+  return perpDot(r, v) * -proNavGain * length(v) / dot(r, r);
 }
 
-fn proNav3D(relPos : vec3f, relVel : vec3f, forward : vec3f) -> vec3f {
-  let omega = cross(relPos, relVel) / dot(relPos, relPos);
-	return cross(forward * -proNavGain * length(relVel), omega);
+fn perpDot(a: vec2f, b: vec2f) -> f32 {
+	return a.x*b.y - a.y*b.x;
 }
 
 fn computeTurnAcceleration(relAng : f32, relAngVel : f32) -> f32 {
