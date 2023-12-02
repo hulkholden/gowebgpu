@@ -9,4 +9,5 @@ go_library(
     ],
     importpath = "github.com/hulkholden/gowebgpu/common/vmath",
     visibility = ["//visibility:public"],
+    deps = ["//common/math32"],
 )

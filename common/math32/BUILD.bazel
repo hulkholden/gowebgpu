@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "math32",
+    srcs = ["math32.go"],
+    importpath = "github.com/hulkholden/gowebgpu/common/math32",
+    visibility = ["//visibility:public"],
+)
