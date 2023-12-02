@@ -195,6 +195,7 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
   if (params.maxSpeed == 0) {
     localLinAcc.y = params.maxAcc;
   } else {
+    // Relative velocity is negative as we're closing on the target.
     let speed = -localRel.vel.y;
     if (speed < params.maxSpeed) {
       let maxAcc = min((params.maxSpeed - speed) / params.deltaT, params.maxAcc);
