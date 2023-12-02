@@ -140,7 +140,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 		boundaryBounceFactor: 0.95,
 	}
-	simParamBuffer := engine.InitUniformBuffer(device, simParams)
+	simParamBuffer := engine.InitUniformBuffer(device, simParams, engine.WithCopyDstUsage())
 	// TODO: add sim params to GUI.
 
 	const boidScale = 500
@@ -149,12 +149,12 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		+0.01 * boidScale, -0.02 * boidScale,
 		+0.00 * boidScale, +0.02 * boidScale,
 	}
-	spriteVertexBuffer := engine.InitStorageBuffer(device, vertexBufferData)
+	spriteVertexBuffer := engine.InitStorageBuffer(device, vertexBufferData, engine.WithVertexUsage())
 
 	initialParticleData := initParticleData(numParticles, simParams)
 	particleBuffers := []engine.StorageBuffer{
-		engine.InitStorageBuffer(device, initialParticleData),
-		engine.InitStorageBuffer(device, initialParticleData),
+		engine.InitStorageBuffer(device, initialParticleData, engine.WithVertexUsage()),
+		engine.InitStorageBuffer(device, initialParticleData, engine.WithVertexUsage()),
 	}
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.

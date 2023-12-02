@@ -12,14 +12,19 @@ type StorageBuffer struct {
 	buffer wasmgpu.GPUBuffer
 }
 
-func InitStorageBuffer[T any](device wasmgpu.GPUDevice, values []T) StorageBuffer {
-	// TODO: use Struct?
+func InitStorageBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) StorageBuffer {
+	// TODO: use Struct to get this?
 	byteLen := int(unsafe.Sizeof(values[0])) * len(values)
-	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
+
+	desc := wasmgpu.GPUBufferDescriptor{
 		Size:             wasmgpu.GPUSize64(byteLen),
-		Usage:            wasmgpu.GPUBufferUsageFlagsVertex | wasmgpu.GPUBufferUsageFlagsStorage,
+		Usage:            wasmgpu.GPUBufferUsageFlagsStorage,
 		MappedAtCreation: opt.V(true),
-	})
+	}
+	for _, opt := range opts {
+		opt(&desc)
+	}
+	buffer := device.CreateBuffer(desc)
 	js.CopyBytesToJS(uint8ArrayCtor.New(buffer.GetMappedRange(0, 0)), sliceAsBytesSlice(values))
 	buffer.Unmap()
 

@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "engine_lib",
     srcs = [
+        "buffer_options.go",
         "engine.go",
         "storage_buffer.go",
         "types.go",

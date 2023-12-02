@@ -11,13 +11,19 @@ type UniformBuffer struct {
 	buffer wasmgpu.GPUBuffer
 }
 
-func InitUniformBuffer[T any](device wasmgpu.GPUDevice, values T) UniformBuffer {
+func InitUniformBuffer[T any](device wasmgpu.GPUDevice, values T, opts ...BufferOption) UniformBuffer {
+	// TODO: use Struct to get this?
 	byteLen := unsafe.Sizeof(values)
-	buffer := device.CreateBuffer(wasmgpu.GPUBufferDescriptor{
-		Size:  wasmgpu.GPUSize64(byteLen),
-		Usage: wasmgpu.GPUBufferUsageFlagsUniform | wasmgpu.GPUBufferUsageFlagsCopyDst,
-	})
 
+	desc := wasmgpu.GPUBufferDescriptor{
+		Size:  wasmgpu.GPUSize64(byteLen),
+		Usage: wasmgpu.GPUBufferUsageFlagsUniform,
+	}
+	for _, opt := range opts {
+		opt(&desc)
+	}
+
+	buffer := device.CreateBuffer(desc)
 	b := UniformBuffer{
 		device: device,
 		buffer: buffer,
