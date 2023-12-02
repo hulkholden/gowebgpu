@@ -187,14 +187,19 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
   let rel = referenceFrameSub(desired, current);
   // Transform into the missile's coordinate system.
   let localRel = referenceFrameRotate(rel, -current.angle);
-  let forward = vec2f(0.0, 1.0);
-  var localLinAcc = proNav2D(localRel.pos, localRel.vel, forward);
 
+  var localLinAcc = vec2f(0, 0);
+  // Apply proportional navigation to track towards the target.
+  localLinAcc.x = proNav2D(localRel.pos, localRel.vel);
 	// Accelerate forward as fast as possible while staying under MaxSpeed (with respect to target).
-  let speed = -localRel.vel.y;
-  if (params.maxSpeed == 0 || speed < params.maxSpeed) {
-    let maxAcc = min((params.maxSpeed - speed) / params.deltaT, params.maxAcc);
-    localLinAcc.y += maxAcc;
+  if (params.maxSpeed == 0) {
+    localLinAcc.y = params.maxAcc;
+  } else {
+    let speed = -localRel.vel.y;
+    if (speed < params.maxSpeed) {
+      let maxAcc = min((params.maxSpeed - speed) / params.deltaT, params.maxAcc);
+      localLinAcc.y = maxAcc;
+    }
   }
 
   // Limit acceleration
@@ -211,7 +216,7 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Co
 
 // A version of https://en.wikipedia.org/wiki/Proportional_navigation simplified for 2D.
 fn proNav2D(r : vec2f, v : vec2f) -> f32 {
-  return perpDot(r, v) * -proNavGain * length(v) / dot(r, r);
+  return -proNavGain * perpDot(r, v) * length(v) / dot(r, r);
 }
 
 fn perpDot(a: vec2f, b: vec2f) -> f32 {
