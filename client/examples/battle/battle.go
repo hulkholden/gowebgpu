@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	numParticles = 4
+	numParticles = 100
 
 	initialVelScale = 100.0
 )
@@ -282,9 +282,9 @@ func initParticleData(n int, params SimParams) []Particle {
 	}
 
 	chooser, _ := weightedrand.NewChooser(
-		weightedrand.NewChoice(particleChoice{BodyTypeShip, 0}, 8),
-		weightedrand.NewChoice(particleChoice{BodyTypeShip, 1}, 1),
-		weightedrand.NewChoice(particleChoice{BodyTypeShip, 2}, 1),
+		weightedrand.NewChoice(particleChoice{BodyTypeShip, 0}, 100),
+		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 1}, 5),
+		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 2}, 5),
 	)
 
 	data := make([]Particle, n)
@@ -300,20 +300,35 @@ func initParticleData(n int, params SimParams) []Particle {
 		data[i].targetIdx = 0xffff_ffff
 	}
 
-	// Assign targets.
 	for i, pi := range data {
-		if data[i].BodyType() != BodyTypeMissile {
-			continue
-		}
-		for j, pj := range data {
-			if pj.BodyType() != BodyTypeShip || pj.Team() == pi.Team() {
-				continue
-			}
-			data[i].targetIdx = uint32(j)
-			break
-		}
+		data[i].targetIdx = uint32(findTarget(pi, data))
 	}
 	return data
+}
+
+func findTarget(self Particle, particles []Particle) int {
+	selfTeam := self.Team()
+	if self.BodyType() != BodyTypeMissile {
+		return -1
+	}
+
+	wantType := BodyTypeMissile
+	if selfTeam == 2 {
+		wantType = BodyTypeShip
+	}
+
+	closestIdx := -1
+	var closestDistSq float32
+	for idx, other := range particles {
+		if other.Team() == selfTeam || other.BodyType() != wantType {
+			continue
+		}
+		if distSq := self.pos.DistanceSq(other.pos); closestIdx < 0 || distSq < float32(closestDistSq) {
+			closestDistSq = distSq
+			closestIdx = idx
+		}
+	}
+	return closestIdx
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {
