@@ -7,18 +7,20 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
-func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, data []byte, opts ...BufferOption) wasmgpu.GPUBuffer {
+func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, data []byte, initContents bool, opts ...BufferOption) wasmgpu.GPUBuffer {
 	desc := wasmgpu.GPUBufferDescriptor{
 		Size:             wasmgpu.GPUSize64(len(data)),
 		Usage:            usage,
-		MappedAtCreation: opt.V(true),
+		MappedAtCreation: opt.V(initContents),
 	}
 	for _, opt := range opts {
 		opt(&desc)
 	}
 	buffer := device.CreateBuffer(desc)
-	js.CopyBytesToJS(uint8ArrayCtor.New(buffer.GetMappedRange(0, 0)), data)
-	buffer.Unmap()
+	if initContents {
+		js.CopyBytesToJS(uint8ArrayCtor.New(buffer.GetMappedRange(0, 0)), data)
+		buffer.Unmap()
+	}
 	return buffer
 }
 
@@ -28,7 +30,7 @@ type StorageBuffer struct {
 
 func InitStorageBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) StorageBuffer {
 	data := sliceAsBytesSlice(values)
-	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, opts...)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
 	return StorageBuffer{
 		buffer: buffer,
 	}
@@ -45,7 +47,7 @@ type UniformBuffer struct {
 
 func InitUniformBuffer[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) UniformBuffer {
 	data := structAsByteSlice(value)
-	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsUniform, data, opts...)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsUniform, data, true, opts...)
 	return UniformBuffer{
 		device: device,
 		buffer: buffer,
@@ -59,4 +61,41 @@ func (b UniformBuffer) UpdateBuffer(bytes []byte) {
 
 func (b UniformBuffer) Buffer() wasmgpu.GPUBuffer {
 	return b.buffer
+}
+
+type DebugBuffer[T any] struct {
+	buffer wasmgpu.GPUBuffer
+	size   int
+}
+
+func InitDebugBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) DebugBuffer[T] {
+	data := sliceAsBytesSlice(values)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsMapRead|wasmgpu.GPUBufferUsageFlagsCopyDst, data, false, opts...)
+	return DebugBuffer[T]{
+		buffer: buffer,
+		size:   len(data),
+	}
+}
+
+func (b DebugBuffer[T]) Buffer() wasmgpu.GPUBuffer {
+	return b.buffer
+}
+
+func (b DebugBuffer[T]) BufferSize() wasmgpu.GPUSize64 {
+	return wasmgpu.GPUSize64(b.size)
+}
+
+func (b DebugBuffer[T]) ReadAsync(callback func(data []T)) {
+	promise := b.buffer.MapAsync(wasmgpu.GPUMapModeFlagsRead, 0, b.BufferSize())
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) any {
+		ab := b.buffer.GetMappedRange(0, b.BufferSize())
+		abCopy := ab.Call("slice")
+		b.buffer.Unmap()
+
+		bytes := make([]byte, b.size)
+		numBytes := js.CopyBytesToGo(bytes, uint8ArrayCtor.New(abCopy))
+		typedData := byteSliceAsStructSlice[T](bytes[:numBytes])
+		callback(typedData)
+		return nil
+	}))
 }

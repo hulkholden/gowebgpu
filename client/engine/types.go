@@ -36,8 +36,8 @@ func structAsByteSlice[T any](data T) []byte {
 	return bytes
 }
 
-// ByteSliceAsStructSlice reinterprets the provided sturct as a byte[].
-func ByteSliceAsStructSlice[T any](data []byte) []T {
+// byteSliceAsStructSlice reinterprets the provided sturct as a byte[].
+func byteSliceAsStructSlice[T any](data []byte) []T {
 	ptr := (*T)(unsafe.Pointer(&data[0]))
 	var zero T
 	l := uintptr(len(data)) / unsafe.Sizeof(zero)
