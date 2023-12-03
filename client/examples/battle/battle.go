@@ -1,6 +1,7 @@
 package battle
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -18,6 +19,8 @@ const (
 	numParticles = 100
 
 	initialVelScale = 100.0
+
+	enableDebugBuffer = false
 )
 
 type ARGB uint32
@@ -152,9 +155,15 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	spriteVertexBuffer := engine.InitStorageBuffer(device, vertexBufferData, engine.WithVertexUsage())
 
 	initialParticleData := initParticleData(numParticles, simParams)
+	particleBufferOpts := []engine.BufferOption{
+		engine.WithVertexUsage(),
+	}
+	if enableDebugBuffer {
+		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
+	}
 	particleBuffers := []engine.StorageBuffer{
-		engine.InitStorageBuffer(device, initialParticleData, engine.WithVertexUsage()),
-		engine.InitStorageBuffer(device, initialParticleData, engine.WithVertexUsage()),
+		engine.InitStorageBuffer(device, initialParticleData, particleBufferOpts...),
+		engine.InitStorageBuffer(device, initialParticleData, particleBufferOpts...),
 	}
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
@@ -238,6 +247,12 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
 
+	var debugBuffer engine.DebugBuffer[Particle]
+	if enableDebugBuffer {
+		debugData := make([]Particle, 2)
+		debugBuffer = engine.InitDebugBuffer(device, debugData)
+	}
+
 	t := 0
 	update := func() {
 		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
@@ -261,10 +276,19 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
 			passEncoder.End()
 		}
+		if enableDebugBuffer {
+			commandEncoder.CopyBufferToBuffer(particleBuffers[(t+1)%2].Buffer(), 0, debugBuffer.Buffer(), 0, debugBuffer.BufferSize())
+		}
 
 		device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
 			commandEncoder.Finish(),
 		})
+
+		if enableDebugBuffer {
+			debugBuffer.ReadAsync(func(particles []Particle) {
+				fmt.Printf("Paticles[1]]: %+v\n", particles[1])
+			})
+		}
 
 		t++
 	}
