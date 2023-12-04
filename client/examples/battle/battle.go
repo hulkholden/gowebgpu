@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	numParticles = 100
+	numParticles = 500
 
 	initialVelScale = 100.0
 
@@ -146,8 +146,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 		maxMissileAge: 10.0,
 
-		maxSpeed:  200.0,
-		maxAcc:    300.0,
+		maxSpeed:  100.0,
+		maxAcc:    150.0,
 		maxAngAcc: 16.0,
 
 		boundaryBounceFactor: 0.95,
