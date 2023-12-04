@@ -328,6 +328,18 @@ func initParticleData(n int, params SimParams) []Particle {
 		data[i].angularVel = (rand.Float32() - 0.5) * 1
 
 		choice := chooser.Pick()
+
+		// For debugging single missile.
+		// if i == 0 {
+		// 	data[0].pos = vmath.NewV2(0, 0)
+		// 	choice.bodyType = BodyTypeShip
+		// 	choice.team = 0
+		// } else {
+		// 	choice.bodyType = BodyTypeMissile
+		// 	choice.team = 1
+		// 	data[i].vel = vmath.NewV2(0, 0)
+		// }
+
 		data[i].metadata = makeMeta(choice.bodyType, choice.team)
 		data[i].col = uint32(choice.team.Color())
 		data[i].targetIdx = 0xffff_ffff
