@@ -344,9 +344,9 @@ func findTarget(self Particle, particles []Particle) int {
 		return -1
 	}
 
-	wantType := BodyTypeMissile
+	wantType := BodyTypeShip
 	if selfTeam == 2 {
-		wantType = BodyTypeShip
+		wantType = BodyTypeMissile
 	}
 
 	closestIdx := -1
