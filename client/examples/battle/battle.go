@@ -45,6 +45,8 @@ type SimParams struct {
 	avoidScale    float32
 	cVelScale     float32
 
+	maxMissileAge float32
+
 	// boundaryBounceFactor is the velocity preserved after colliding with the boundary.
 	boundaryBounceFactor float32
 
@@ -63,8 +65,12 @@ type Particle struct {
 	col        uint32
 	metadata   uint32
 
+	// TODO: compress these down. Pack age in the metadata word?
 	targetIdx uint32
-	pad       uint32
+	age       float32
+
+	debugVal float32
+	pad      float32
 }
 
 func (p Particle) BodyType() BodyType {
@@ -136,6 +142,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		cMassScale: 0.02,
 		avoidScale: 0.05,
 		cVelScale:  0.005,
+
+		maxMissileAge: 10.0,
 
 		maxSpeed:  200.0,
 		maxAcc:    300.0,

@@ -73,6 +73,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let particle = particlesA.particles[index];
 
   var f = particleReferenceFrame(particle);
+  var age = particle.age + params.deltaT;
 
   switch particleType(particle) {
     case bodyTypeNone: {
@@ -82,6 +83,16 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       f.angle = angleOf(f.vel, f.angle);
     }
     case bodyTypeMissile: {
+      // Reset on contact r 
+      let targetP = particlesA.particles[particle.targetIdx];
+      if (particle.age > params.maxMissileAge || distance(particle.pos, targetP.pos) < 10.0) {
+        f.pos = 2.0 * (rand22(f.pos) - 0.5) * 1000.0;
+        f.vel = 2.0 * (rand22(f.vel) - 0.5) * 0.0;
+        f.angle = 0.0;
+        f.angularVel = 0.0;
+        age = 0.0;
+      }
+
       let control = updateMissile(f, index, particle.targetIdx);
       f.vel += control.linearAcc * params.deltaT;
       f.angularVel += control.angularAcc * params.deltaT;
@@ -105,6 +116,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   particlesB.particles[index].vel = f.vel;
   particlesB.particles[index].angle = f.angle;
   particlesB.particles[index].angularVel = f.angularVel;
+  particlesB.particles[index].age = age;
 }
 
 fn particleReferenceFrame(particle : Particle) -> ReferenceFrame {
@@ -235,3 +247,15 @@ fn computeTurnAcceleration(relAng : f32, relAngVel : f32) -> f32 {
 	let maxBrakingVel = sqrt(2.0 * maxAcc * absAngDiff) * absAngSign;
 	return clamp((maxBrakingVel + relAngVel) / params.deltaT, -maxAcc, maxAcc);
 }
+
+// https://gist.github.com/munrocket/236ed5ba7e409b8bdf1ff6eca5dcdc39
+fn hash22(p: vec2u) -> vec2u {
+    var v = p * 1664525u + 1013904223u;
+    v.x += v.y * 1664525u; v.y += v.x * 1664525u;
+    v ^= v >> vec2u(16u);
+    v.x += v.y * 1664525u; v.y += v.x * 1664525u;
+    v ^= v >> vec2u(16u);
+    return v;
+}
+
+fn rand22(f: vec2f) -> vec2f { return vec2f(hash22(bitcast<vec2u>(f))) / f32(0xffffffff); }
