@@ -86,8 +86,8 @@ type Team uint8
 
 var teamColMap = map[Team]ARGB{
 	0: NiceRed,
-	1: NicePurple,
-	2: NiceBlue,
+	1: NiceBlue,
+	2: NicePurple,
 	3: NiceOrange,
 }
 
