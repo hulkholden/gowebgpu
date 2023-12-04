@@ -54,7 +54,8 @@ type SimParams struct {
 	maxAcc    float32
 	maxAngAcc float32
 
-	pad uint32
+	// TODO: need to ensure struct is multiple of alignment size (8 for V2).
+	// pad uint32
 }
 
 type Particle struct {
