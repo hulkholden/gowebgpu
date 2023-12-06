@@ -72,56 +72,51 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let index = GlobalInvocationID.x;
   var particle = particlesA.particles[index];
 
-  var f = particleReferenceFrame(particle);
-  var age = particle.age + params.deltaT;
+  let f = particleReferenceFrame(particle);
 
   switch particleType(particle) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      f.vel = flock(particle, index);
-      f.angle = angleOf(f.vel, f.angle);
+      particle.vel = flock(particle, index);
+      particle.angle = angleOf(particle.vel, particle.angle);
     }
     case bodyTypeMissile: {
       if (particle.targetIdx < 0) {
         particle.targetIdx = findTarget(particle);
-        particlesB.particles[index].targetIdx = particle.targetIdx;
       }
 
       // Reset on contact.
       let targetP = particlesA.particles[particle.targetIdx];
       if (particle.age > params.maxMissileAge || distance(particle.pos, targetP.pos) < 10.0) {
-        f.pos = 2.0 * (rand22(f.pos) - 0.5) * 1000.0;
-        f.vel = 2.0 * (rand22(f.vel) - 0.5) * 0.0;
-        f.angle = 0.0;
-        f.angularVel = 0.0;
-        age = 0.0;
+        particle.pos = 2.0 * (rand22(particle.pos) - 0.5) * 1000.0;
+        particle.vel = 2.0 * (rand22(particle.vel) - 0.5) * 0.0;
+        particle.angle = 0.0;
+        particle.angularVel = 0.0;
+        particle.age = 0.0;
       }
 
       let control = updateMissile(f, index, particle.targetIdx);
-      f.vel += control.linearAcc * params.deltaT;
-      f.angularVel += control.angularAcc * params.deltaT;
+      particle.vel += control.linearAcc * params.deltaT;
+      particle.angularVel += control.angularAcc * params.deltaT;
     }
     default: {
     }
   }
 
   // kinematic update
-  f.pos += f.vel * params.deltaT;
-  f.angle = normalizeAngle(f.angle + f.angularVel * params.deltaT);
+  particle.age += params.deltaT;
+  particle.pos += particle.vel * params.deltaT;
+  particle.angle = normalizeAngle(particle.angle + particle.angularVel * params.deltaT);
 
   // Bounce off the boundary.
-  let under = (f.pos < params.minBound) & (f.vel < vec2());
-  let over = (f.pos > params.maxBound) & (f.vel > vec2());
-  f.vel = select(f.vel, -f.vel * params.boundaryBounceFactor, under | over);
-  f.pos = clamp(f.pos, params.minBound, params.maxBound);
+  let under = (particle.pos < params.minBound) & (particle.vel < vec2());
+  let over = (particle.pos > params.maxBound) & (particle.vel > vec2());
+  particle.vel = select(particle.vel, -particle.vel * params.boundaryBounceFactor, under | over);
+  particle.pos = clamp(particle.pos, params.minBound, params.maxBound);
 
   // Write back
-  particlesB.particles[index].pos = f.pos;
-  particlesB.particles[index].vel = f.vel;
-  particlesB.particles[index].angle = f.angle;
-  particlesB.particles[index].angularVel = f.angularVel;
-  particlesB.particles[index].age = age;
+  particlesB.particles[index] = particle;
 }
 
 fn findTarget(particle : Particle) -> i32 {
