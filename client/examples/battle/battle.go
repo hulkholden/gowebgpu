@@ -67,7 +67,7 @@ type Particle struct {
 	metadata   uint32
 
 	// TODO: compress these down. Pack age in the metadata word?
-	targetIdx uint32
+	targetIdx int32
 	age       float32
 
 	debugVal float32
@@ -342,38 +342,9 @@ func initParticleData(n int, params SimParams) []Particle {
 
 		data[i].metadata = makeMeta(choice.bodyType, choice.team)
 		data[i].col = uint32(choice.team.Color())
-		data[i].targetIdx = 0xffff_ffff
-	}
-
-	for i, pi := range data {
-		data[i].targetIdx = uint32(findTarget(pi, data))
+		data[i].targetIdx = -1
 	}
 	return data
-}
-
-func findTarget(self Particle, particles []Particle) int {
-	selfTeam := self.Team()
-	if self.BodyType() != BodyTypeMissile {
-		return -1
-	}
-
-	wantType := BodyTypeShip
-	if selfTeam == 2 {
-		wantType = BodyTypeMissile
-	}
-
-	closestIdx := -1
-	var closestDistSq float32
-	for idx, other := range particles {
-		if other.Team() == selfTeam || other.BodyType() != wantType {
-			continue
-		}
-		if distSq := self.pos.DistanceSq(other.pos); closestIdx < 0 || distSq < float32(closestDistSq) {
-			closestDistSq = distSq
-			closestIdx = idx
-		}
-	}
-	return closestIdx
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {

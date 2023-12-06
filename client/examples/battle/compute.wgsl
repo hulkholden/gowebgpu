@@ -70,7 +70,7 @@ fn modReplacement(x : f32, y : f32) -> f32 {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let index = GlobalInvocationID.x;
-  let particle = particlesA.particles[index];
+  var particle = particlesA.particles[index];
 
   var f = particleReferenceFrame(particle);
   var age = particle.age + params.deltaT;
@@ -83,7 +83,12 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       f.angle = angleOf(f.vel, f.angle);
     }
     case bodyTypeMissile: {
-      // Reset on contact r 
+      if (particle.targetIdx < 0) {
+        particle.targetIdx = findTarget(particle);
+        particlesB.particles[index].targetIdx = particle.targetIdx;
+      }
+
+      // Reset on contact.
       let targetP = particlesA.particles[particle.targetIdx];
       if (particle.age > params.maxMissileAge || distance(particle.pos, targetP.pos) < 10.0) {
         f.pos = 2.0 * (rand22(f.pos) - 0.5) * 1000.0;
@@ -117,6 +122,30 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   particlesB.particles[index].angle = f.angle;
   particlesB.particles[index].angularVel = f.angularVel;
   particlesB.particles[index].age = age;
+}
+
+fn findTarget(particle : Particle) -> i32 {
+	let selfTeam = particleTeam(particle);
+  let selfType = particleType(particle);
+	if (selfType != bodyTypeMissile) {
+		return -1;
+	}
+
+	let wantType = select(bodyTypeShip, bodyTypeMissile, selfTeam == 2);
+	var closestIdx = -1;
+	var closestDist = 0.0;
+  for (var idx = 0u; idx < arrayLength(&particlesA.particles); idx++) {
+    let other = particlesA.particles[idx];
+		if (particleTeam(other) == selfTeam || particleType(other) != wantType) {
+			continue;
+		}
+    let dist = distance(particle.pos, other.pos);
+		if (closestIdx < 0 || dist < closestDist) {
+			closestDist = dist;
+			closestIdx = i32(idx);
+		}
+	}
+	return closestIdx;
 }
 
 fn particleReferenceFrame(particle : Particle) -> ReferenceFrame {
@@ -178,8 +207,8 @@ fn flock(particle : Particle, selfIdx : u32) -> vec2f {
   return normalize(vVel) * clamp(length(vVel), 0.0, 100.0);
 }
 
-fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : u32) -> Control {
-  if (targetIdx >= arrayLength(&particlesA.particles)) {
+fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Control {
+  if (targetIdx < 0 || targetIdx >= i32(arrayLength(&particlesA.particles))) {
     return Control();
   }
 
