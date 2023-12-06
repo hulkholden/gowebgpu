@@ -317,7 +317,7 @@ func initParticleData(n int, params SimParams) []Particle {
 	chooser, _ := weightedrand.NewChooser(
 		weightedrand.NewChoice(particleChoice{BodyTypeShip, 0}, 100),
 		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 1}, 5),
-		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 2}, 5),
+		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 2}, 1), // AntiMissile
 	)
 
 	data := make([]Particle, n)
