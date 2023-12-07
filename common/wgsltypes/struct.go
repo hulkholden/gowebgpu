@@ -22,12 +22,14 @@ var goToTypeMap = map[string]TypeName{
 }
 
 var typeMap = map[TypeName]Type{
-	"f32":       {Name: "f32", AlignOf: 4, SizeOf: 4},
-	"i32":       {Name: "i32", AlignOf: 4, SizeOf: 4},
-	"u32":       {Name: "u32", AlignOf: 4, SizeOf: 4},
-	"vec2<f32>": {Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
-	"vec3<f32>": {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
-	"vec4<f32>": {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
+	"f32":         {Name: "f32", AlignOf: 4, SizeOf: 4},
+	"i32":         {Name: "i32", AlignOf: 4, SizeOf: 4},
+	"u32":         {Name: "u32", AlignOf: 4, SizeOf: 4},
+	"atomic<i32>": {Name: "atomic<i32>", AlignOf: 4, SizeOf: 4},
+	"atomic<u32>": {Name: "atomic<u32>", AlignOf: 4, SizeOf: 4},
+	"vec2<f32>":   {Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
+	"vec3<f32>":   {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
+	"vec4<f32>":   {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
 }
 
 type Type struct {
@@ -94,6 +96,12 @@ func NewStruct[T any](name string) (Struct, error) {
 		wgslTypeName, ok := goToTypeMap[fieldType]
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType)
+		}
+
+		// If the field has an atomic tag then treat as atomic<T>.
+		atomicStr := field.Tag.Get("atomic")
+		if atomicStr == "true" {
+			wgslTypeName = TypeName(fmt.Sprintf("atomic<%s>", wgslTypeName))
 		}
 		wgslType, ok := typeMap[wgslTypeName]
 		if !ok {
