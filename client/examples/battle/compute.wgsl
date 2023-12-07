@@ -84,8 +84,10 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     case bodyTypeMissile: {
       if (particle.targetIdx < 0) {
         particle.targetIdx = findTarget(particle);
+        if (particle.targetIdx < 0) {
+          break;
+        }
       }
-
       // Reset on contact.
       let targetP = particlesA.particles[particle.targetIdx];
       if (particle.age > params.maxMissileAge || distance(particle.pos, targetP.pos) < 10.0) {
@@ -212,10 +214,6 @@ fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Control {
 }
 
 fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Control {
-  if (targetIdx < 0 || targetIdx >= i32(arrayLength(&particlesA.particles))) {
-    return Control();
-  }
-
   let targetP = particlesA.particles[targetIdx];
   let targetF = particleReferenceFrame(targetP);
 
