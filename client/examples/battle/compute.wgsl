@@ -74,12 +74,12 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   let f = particleReferenceFrame(particle);
 
+  var control = Control();
   switch particleType(particle) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      particle.vel = flock(particle, index);
-      particle.angle = angleOf(particle.vel, particle.angle);
+      control = flock(f, particleTeam(particle), index);
     }
     case bodyTypeMissile: {
       if (particle.targetIdx < 0) {
@@ -95,10 +95,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         particle.angularVel = 0.0;
         particle.age = 0.0;
       }
-
-      let control = updateMissile(f, index, particle.targetIdx);
-      particle.vel += control.linearAcc * params.deltaT;
-      particle.angularVel += control.angularAcc * params.deltaT;
+      control = updateMissile(f, index, particle.targetIdx);
     }
     default: {
     }
@@ -106,7 +103,11 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
   // kinematic update
   particle.age += params.deltaT;
+
+  particle.vel += control.linearAcc * params.deltaT;
   particle.pos += particle.vel * params.deltaT;
+
+  particle.angularVel += control.angularAcc * params.deltaT;
   particle.angle = normalizeAngle(particle.angle + particle.angularVel * params.deltaT);
 
   // Bounce off the boundary.
@@ -114,6 +115,12 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let over = (particle.pos > params.maxBound) & (particle.vel > vec2());
   particle.vel = select(particle.vel, -particle.vel * params.boundaryBounceFactor, under | over);
   particle.pos = clamp(particle.pos, params.minBound, params.maxBound);
+
+  if (particleType(particle) == bodyTypeShip) {
+    // clamp velocity for a more pleasing simulation
+    // TODO: make upper bound a param.
+    particle.vel =  normalize(particle.vel) * clamp(length(particle.vel), 0.0, 100.0);
+  }
 
   // Write back
   particlesB.particles[index] = particle;
@@ -155,16 +162,12 @@ fn particleTeam(particle : Particle) -> u32 {
   return particle.metadata & 0xff;
 }
 
-fn flock(particle : Particle, selfIdx : u32) -> vec2f {
-  var vPos = particle.pos;
-  var vVel = particle.vel;
+fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Control {
   var cMass = vec2(0.0);
   var cVel = vec2(0.0);
   var colVel = vec2(0.0);
   var cMassCount = 0u;
   var cVelCount = 0u;
-
-  let myTeam = particleTeam(particle);
 
   for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
     let other = particlesA.particles[i];
@@ -173,12 +176,12 @@ fn flock(particle : Particle, selfIdx : u32) -> vec2f {
     }
     let pos = other.pos.xy;
     let vel = other.vel.xy;
-    let dPos = pos - vPos;
+    let dPos = pos - current.pos;
     let dist = length(dPos);
     if (dist < params.avoidDistance) {
       colVel -= dPos;
     }
-    if (particleTeam(other) == myTeam) {
+    if (particleTeam(other) == selfTeam) {
       if (dist < params.cMassDistance) {
         cMass += pos;
         cMassCount++;
@@ -190,16 +193,22 @@ fn flock(particle : Particle, selfIdx : u32) -> vec2f {
     }
   }
   if (cMassCount > 0) {
-    cMass = (cMass / vec2(f32(cMassCount))) - vPos;
+    cMass = (cMass / vec2(f32(cMassCount))) - current.pos;
   }
   if (cVelCount > 0) {
     cVel /= f32(cVelCount);
   }
-  vVel += (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
+  
+  let dVel = (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
+  let linAcc = dVel / params.deltaT;
 
-  // clamp velocity for a more pleasing simulation
-  // TODO: make upper bound a param.
-  return normalize(vVel) * clamp(length(vVel), 0.0, 100.0);
+  // Set the desired reference frame to the current state, attempting to orient with the velocity vector.
+  // TODO: we could ignore linear component of this - maybe the compiler does that for us?
+  let desired = ReferenceFrame(current.pos, current.vel, angleOf(current.vel, current.angle), 0.0);
+  let rel = referenceFrameSub(desired, current);
+  let angAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
+
+  return Control(linAcc, angAcc);
 }
 
 fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Control {
