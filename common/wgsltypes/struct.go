@@ -95,7 +95,7 @@ func NewStruct[T any](name string) (Struct, error) {
 		}
 		wgslTypeName, ok := goToTypeMap[fieldType]
 		if !ok {
-			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType)
+			return Struct{}, fmt.Errorf("unhandled Go type: %q", field.Type.String())
 		}
 
 		// If the field has an atomic tag then treat as atomic<T>.
