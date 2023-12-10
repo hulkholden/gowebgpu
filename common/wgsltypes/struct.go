@@ -101,14 +101,18 @@ func RegisterStruct[T any]() (Struct, error) {
 
 		arrayLen := 0
 		fieldType := field.Type
+		runtimeArray := false
 		if fieldType.Kind() == reflect.Array {
 			arrayLen = fieldType.Len()
 			fieldType = fieldType.Elem()
+			runtimeArray = field.Tag.Get("runtimeArray") == "true"
+
+			// TODO: if this is a runtimeArray then verify it's the last field in the struct.
 		}
 
 		fieldTypeName := makeGoTypeName(fieldType)
 		isAtomic := field.Tag.Get("atomic") == "true"
-		wgslType, ok := lookupWGSLType(fieldTypeName, isAtomic, arrayLen)
+		wgslType, ok := lookupWGSLType(fieldTypeName, isAtomic, arrayLen, runtimeArray)
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled type: %q", fieldType.String())
 		}
@@ -176,7 +180,7 @@ func makeGoTypeName(t reflect.Type) GoTypeName {
 	return GoTypeName(t.Name())
 }
 
-func lookupWGSLType(goTypeName GoTypeName, isAtomic bool, arrayLen int) (Type, bool) {
+func lookupWGSLType(goTypeName GoTypeName, isAtomic bool, arrayLen int, runtimeArray bool) (Type, bool) {
 	wgslType, ok := lookupPrimitiveWGSLType(goTypeName)
 	if !ok {
 		return Type{}, false
@@ -188,7 +192,11 @@ func lookupWGSLType(goTypeName GoTypeName, isAtomic bool, arrayLen int) (Type, b
 	}
 	// If the field is an array then treat is as array<T,N>.
 	if arrayLen > 0 {
-		wgslType = makeArray(wgslType, arrayLen)
+		if runtimeArray {
+			wgslType = makeRuntimeArray(wgslType, arrayLen)
+		} else {
+			wgslType = makeArray(wgslType, arrayLen)
+		}
 	}
 
 	return wgslType, true
@@ -218,6 +226,14 @@ func makeAtomic(t Type) Type {
 		Name:    TypeName(fmt.Sprintf("atomic<%s>", t.Name)),
 		AlignOf: t.AlignOf,
 		SizeOf:  t.SizeOf,
+	}
+}
+
+func makeRuntimeArray(t Type, n int) Type {
+	return Type{
+		Name:    TypeName(fmt.Sprintf("array<%s>", t.Name)),
+		AlignOf: t.AlignOf,
+		SizeOf:  t.SizeOf * n,
 	}
 }
 

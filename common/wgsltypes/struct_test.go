@@ -22,7 +22,8 @@ type testStruct struct {
 	atomicInt32Val  int32  `atomic:"true"`
 	atomicUint32Val uint32 `atomic:"true"`
 
-	arrayInt32Val [2]int32
+	arrayInt32Val        [2]int32
+	runtimeArrayInt32Val [2]int32 `runtimeArray:"true"`
 }
 
 func TestNewStruct(t *testing.T) {
@@ -33,7 +34,7 @@ func TestNewStruct(t *testing.T) {
 	want := Struct{
 		Name:   "testStruct",
 		GoName: "github.com/hulkholden/gowebgpu/common/wgsltypes.testStruct",
-		Size:   68,
+		Size:   76,
 		Fields: []string{
 			"vec4",
 			"vec3",
@@ -45,6 +46,7 @@ func TestNewStruct(t *testing.T) {
 			"atomicInt32Val",
 			"atomicUint32Val",
 			"arrayInt32Val",
+			"runtimeArrayInt32Val",
 		},
 		FieldMap: map[string]Field{
 			"vec4": {
@@ -97,6 +99,11 @@ func TestNewStruct(t *testing.T) {
 				Offset:   60,
 				WGSLType: Type{Name: "array<i32, 2>", AlignOf: 4, SizeOf: 8},
 			},
+			"runtimeArrayInt32Val": {
+				Name:     "runtimeArrayInt32Val",
+				Offset:   68,
+				WGSLType: Type{Name: "array<i32>", AlignOf: 4, SizeOf: 8},
+			},
 		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
@@ -122,6 +129,7 @@ func TestToWGSL(t *testing.T) {
   atomicInt32Val : atomic<i32>,
   atomicUint32Val : atomic<u32>,
   arrayInt32Val : array<i32, 2>,
+  runtimeArrayInt32Val : array<i32>,
 }
 `
 	if diff := cmp.Diff(want, got); diff != "" {
