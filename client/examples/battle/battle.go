@@ -82,6 +82,17 @@ func (p Particle) Team() Team {
 	return Team(p.metadata & 0xff)
 }
 
+type Contact struct {
+	aIdx uint32
+	bIdx uint32
+}
+
+type ContactsContainer struct {
+	count    uint32
+	capacity uint32
+	contacts [1024]Contact
+}
+
 type Team uint8
 
 var teamColMap = map[Team]ARGB{
@@ -116,9 +127,11 @@ type Vertex struct {
 }
 
 var (
-	simParamsStruct = wgsltypes.MustRegisterStruct[SimParams]()
-	particleStruct  = wgsltypes.MustRegisterStruct[Particle]()
-	vertexStruct    = wgsltypes.MustRegisterStruct[Vertex]()
+	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
+	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
+	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
+	contactStruct           = wgsltypes.MustRegisterStruct[Contact]()
+	contactsContainerStruct = wgsltypes.MustRegisterStruct[ContactsContainer]()
 )
 
 //go:embed compute.wgsl
