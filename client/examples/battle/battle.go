@@ -174,7 +174,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		+0.01 * boidScale, -0.02 * boidScale,
 		+0.00 * boidScale, +0.02 * boidScale,
 	}
-	spriteVertexBuffer := engine.InitStorageBuffer(device, vertexBufferData, engine.WithVertexUsage())
+	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
 	initialParticleData := initParticleData(numParticles, simParams)
 	particleBufferOpts := []engine.BufferOption{
@@ -184,8 +184,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
 	particleBuffers := []engine.StorageBuffer{
-		engine.InitStorageBuffer(device, initialParticleData, particleBufferOpts...),
-		engine.InitStorageBuffer(device, initialParticleData, particleBufferOpts...),
+		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
+		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
 	}
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.

@@ -26,18 +26,33 @@ func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, dat
 
 type StorageBuffer struct {
 	buffer wasmgpu.GPUBuffer
+	size   int
 }
 
-func InitStorageBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) StorageBuffer {
+func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) StorageBuffer {
+	data := structAsByteSlice(value)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
+	return StorageBuffer{
+		buffer: buffer,
+		size:   len(data),
+	}
+}
+
+func InitStorageBufferSlice[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) StorageBuffer {
 	data := sliceAsBytesSlice(values)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
 	return StorageBuffer{
 		buffer: buffer,
+		size:   len(data),
 	}
 }
 
 func (b StorageBuffer) Buffer() wasmgpu.GPUBuffer {
 	return b.buffer
+}
+
+func (b StorageBuffer) BufferSize() wasmgpu.GPUSize64 {
+	return wasmgpu.GPUSize64(b.size)
 }
 
 type UniformBuffer struct {
