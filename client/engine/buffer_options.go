@@ -21,3 +21,15 @@ func WithCopyDstUsage() BufferOption {
 		d.Usage |= wasmgpu.GPUBufferUsageFlagsCopyDst
 	}
 }
+
+func WithMapReadUsage() BufferOption {
+	return func(d *wasmgpu.GPUBufferDescriptor) {
+		d.Usage |= wasmgpu.GPUBufferUsageFlagsMapRead
+	}
+}
+
+func WithMapWriteUsage() BufferOption {
+	return func(d *wasmgpu.GPUBufferDescriptor) {
+		d.Usage |= wasmgpu.GPUBufferUsageFlagsMapWrite
+	}
+}
