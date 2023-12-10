@@ -22,14 +22,12 @@ var goToTypeMap = map[string]TypeName{
 }
 
 var typeMap = map[TypeName]Type{
-	"f32":         {Name: "f32", AlignOf: 4, SizeOf: 4},
-	"i32":         {Name: "i32", AlignOf: 4, SizeOf: 4},
-	"u32":         {Name: "u32", AlignOf: 4, SizeOf: 4},
-	"atomic<i32>": {Name: "atomic<i32>", AlignOf: 4, SizeOf: 4},
-	"atomic<u32>": {Name: "atomic<u32>", AlignOf: 4, SizeOf: 4},
-	"vec2<f32>":   {Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
-	"vec3<f32>":   {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
-	"vec4<f32>":   {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
+	"f32":       {Name: "f32", AlignOf: 4, SizeOf: 4},
+	"i32":       {Name: "i32", AlignOf: 4, SizeOf: 4},
+	"u32":       {Name: "u32", AlignOf: 4, SizeOf: 4},
+	"vec2<f32>": {Name: "vec2<f32>", AlignOf: 8, SizeOf: 8},
+	"vec3<f32>": {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
+	"vec4<f32>": {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
 }
 
 type Type struct {
@@ -89,23 +87,37 @@ func NewStruct[T any](name string) (Struct, error) {
 
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
-		fieldType := field.Type.Name()
-		if path := field.Type.PkgPath(); path != "" {
-			fieldType = path + "." + fieldType
-		}
-		wgslTypeName, ok := goToTypeMap[fieldType]
-		if !ok {
-			return Struct{}, fmt.Errorf("unhandled Go type: %q", field.Type.String())
+
+		arrayLen := 0
+		fieldType := field.Type
+		if fieldType.Kind() == reflect.Array {
+			arrayLen = fieldType.Len()
+			fieldType = fieldType.Elem()
 		}
 
-		// If the field has an atomic tag then treat as atomic<T>.
-		atomicStr := field.Tag.Get("atomic")
-		if atomicStr == "true" {
-			wgslTypeName = TypeName(fmt.Sprintf("atomic<%s>", wgslTypeName))
+		fieldTypeName := fieldType.Name()
+		if path := fieldType.PkgPath(); path != "" {
+			fieldTypeName = path + "." + fieldTypeName
 		}
+
+		wgslTypeName, ok := goToTypeMap[fieldTypeName]
+		if !ok {
+			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType.String())
+		}
+
 		wgslType, ok := typeMap[wgslTypeName]
 		if !ok {
 			return Struct{}, fmt.Errorf("unhandled WGSL type: %q", wgslTypeName)
+		}
+
+		// If the field has an atomic tag then treat is as atomic<T>.
+		atomicStr := field.Tag.Get("atomic")
+		if atomicStr == "true" {
+			wgslType = makeAtomic(wgslType)
+		}
+		// If the field is an array then treat is as array<T,N>.
+		if arrayLen > 0 {
+			wgslType = makeArray(wgslType, arrayLen)
 		}
 
 		if err := validateOffset(field, wgslType); err != nil {
@@ -120,6 +132,22 @@ func NewStruct[T any](name string) (Struct, error) {
 		}
 	}
 	return s, nil
+}
+
+func makeAtomic(t Type) Type {
+	return Type{
+		Name:    TypeName(fmt.Sprintf("atomic<%s>", t.Name)),
+		AlignOf: t.AlignOf,
+		SizeOf:  t.SizeOf,
+	}
+}
+
+func makeArray(t Type, n int) Type {
+	return Type{
+		Name:    TypeName(fmt.Sprintf("array<%s, %d>", t.Name, n)),
+		AlignOf: t.AlignOf,
+		SizeOf:  t.SizeOf * n,
+	}
 }
 
 // TODO: add test coverage for this.

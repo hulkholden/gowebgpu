@@ -21,6 +21,8 @@ type testStruct struct {
 
 	atomicInt32Val  int32  `atomic:"true"`
 	atomicUint32Val uint32 `atomic:"true"`
+
+	arrayInt32Val [2]int32
 }
 
 func TestNewStruct(t *testing.T) {
@@ -30,7 +32,7 @@ func TestNewStruct(t *testing.T) {
 	}
 	want := Struct{
 		Name: "testStruct",
-		Size: 60,
+		Size: 68,
 		Fields: []string{
 			"vec4",
 			"vec3",
@@ -41,6 +43,7 @@ func TestNewStruct(t *testing.T) {
 			"uint32Val",
 			"atomicInt32Val",
 			"atomicUint32Val",
+			"arrayInt32Val",
 		},
 		FieldMap: map[string]Field{
 			"vec4": {
@@ -88,6 +91,11 @@ func TestNewStruct(t *testing.T) {
 				Offset:   56,
 				WGSLType: Type{Name: "atomic<u32>", AlignOf: 4, SizeOf: 4},
 			},
+			"arrayInt32Val": {
+				Name:     "arrayInt32Val",
+				Offset:   60,
+				WGSLType: Type{Name: "array<i32, 2>", AlignOf: 4, SizeOf: 8},
+			},
 		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
@@ -112,6 +120,7 @@ func TestToWGSL(t *testing.T) {
   uint32Val : u32,
   atomicInt32Val : atomic<i32>,
   atomicUint32Val : atomic<u32>,
+  arrayInt32Val : array<i32, 2>,
 }
 `
 	if diff := cmp.Diff(want, got); diff != "" {
