@@ -26,13 +26,14 @@ type testStruct struct {
 }
 
 func TestNewStruct(t *testing.T) {
-	got, err := NewStruct[testStruct]("testStruct")
+	got, err := RegisterStruct[testStruct]()
 	if err != nil {
 		t.Fatalf("NewStruct() = %v, want nil error", err)
 	}
 	want := Struct{
-		Name: "testStruct",
-		Size: 68,
+		Name:   "testStruct",
+		GoName: "github.com/hulkholden/gowebgpu/common/wgsltypes.testStruct",
+		Size:   68,
 		Fields: []string{
 			"vec4",
 			"vec3",
@@ -104,7 +105,7 @@ func TestNewStruct(t *testing.T) {
 }
 
 func TestToWGSL(t *testing.T) {
-	s, err := NewStruct[testStruct]("testStruct")
+	s, err := RegisterStruct[testStruct]()
 	if err != nil {
 		t.Fatalf("NewStruct() failed unexpectedly: %v", err)
 	}

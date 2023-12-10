@@ -20,7 +20,7 @@ var vertexFormatTypeMap = map[wgsltypes.TypeName]wasmgpu.GPUVertexFormat{
 func makeGPUVertexAttribute(shaderLocation int, s wgsltypes.Struct, fieldName string) wasmgpu.GPUVertexAttribute {
 	field, ok := s.FieldMap[fieldName]
 	if !ok {
-		panic(fmt.Sprintf("field %s.%s does not exist", s.Name, fieldName))
+		panic(fmt.Sprintf("field %s.%s does not exist", s.GoName, fieldName))
 	}
 	return wasmgpu.GPUVertexAttribute{
 		ShaderLocation: wasmgpu.GPUIndex32(shaderLocation),

@@ -116,9 +116,9 @@ type Vertex struct {
 }
 
 var (
-	simParamsStruct = wgsltypes.MustNewStruct[SimParams]("SimParams")
-	particleStruct  = wgsltypes.MustNewStruct[Particle]("Particle")
-	vertexStruct    = wgsltypes.MustNewStruct[Vertex]("Vertex")
+	simParamsStruct = wgsltypes.MustRegisterStruct[SimParams]()
+	particleStruct  = wgsltypes.MustRegisterStruct[Particle]()
+	vertexStruct    = wgsltypes.MustRegisterStruct[Vertex]()
 )
 
 //go:embed compute.wgsl

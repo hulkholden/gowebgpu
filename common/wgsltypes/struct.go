@@ -9,8 +9,11 @@ import (
 // TypeName is the name of a WGSL type.
 type TypeName string
 
+// GoTypeName is the fully qualified name of a Go type.
+type GoTypeName string
+
 // goToTypeMap maps Go types to WGSL types.
-var goToTypeMap = map[string]TypeName{
+var goToTypeMap = map[GoTypeName]TypeName{
 	// Builtin types.
 	"float32": "f32",
 	"int32":   "i32",
@@ -21,7 +24,7 @@ var goToTypeMap = map[string]TypeName{
 	"github.com/hulkholden/gowebgpu/common/vmath.V4": "vec4<f32>",
 }
 
-var typeMap = map[TypeName]Type{
+var builtinTypeMap = map[TypeName]Type{
 	"f32":       {Name: "f32", AlignOf: 4, SizeOf: 4},
 	"i32":       {Name: "i32", AlignOf: 4, SizeOf: 4},
 	"u32":       {Name: "u32", AlignOf: 4, SizeOf: 4},
@@ -29,6 +32,9 @@ var typeMap = map[TypeName]Type{
 	"vec3<f32>": {Name: "vec3<f32>", AlignOf: 16, SizeOf: 12},
 	"vec4<f32>": {Name: "vec4<f32>", AlignOf: 16, SizeOf: 16},
 }
+
+// registeredGoStructs stores all the Go types that have been registered.
+var registeredGoStructs = map[GoTypeName]Struct{}
 
 type Type struct {
 	// Name of the WGSL type.
@@ -41,8 +47,10 @@ type Type struct {
 
 // A Struct provides information about a Go struct.
 type Struct struct {
-	// Name is the name of the struct as it appears in Go.
-	Name string
+	// Name is the name of the struct as it appears in WGSL.
+	Name TypeName
+	// GoName is the name of the struct as it appears in Go.
+	GoName GoTypeName
 	// Size of the structure, in bytes.
 	Size int
 
@@ -64,23 +72,26 @@ type Field struct {
 	WGSLType Type
 }
 
-func MustNewStruct[T any](name string) Struct {
-	s, err := NewStruct[T](name)
+func MustRegisterStruct[T any]() Struct {
+	s, err := RegisterStruct[T]()
 	if err != nil {
-		panic(fmt.Sprintf("exporting %q: %v", name, err))
+		var zero T
+		panic(fmt.Sprintf("exporting %T: %v", zero, err))
 	}
 	return s
 }
 
-func NewStruct[T any](name string) (Struct, error) {
+func RegisterStruct[T any]() (Struct, error) {
 	var t T
 	structType := reflect.TypeOf(t)
+
 	if structType.Kind() != reflect.Struct {
 		return Struct{}, fmt.Errorf("provided type is not a struct")
 	}
 
 	s := Struct{
-		Name:     name,
+		Name:     TypeName(structType.Name()),
+		GoName:   GoTypeName(structType.PkgPath() + "." + structType.Name()),
 		Size:     int(structType.Size()),
 		FieldMap: make(map[string]Field),
 	}
@@ -95,29 +106,11 @@ func NewStruct[T any](name string) (Struct, error) {
 			fieldType = fieldType.Elem()
 		}
 
-		fieldTypeName := fieldType.Name()
-		if path := fieldType.PkgPath(); path != "" {
-			fieldTypeName = path + "." + fieldTypeName
-		}
-
-		wgslTypeName, ok := goToTypeMap[fieldTypeName]
+		fieldTypeName := makeGoTypeName(fieldType)
+		isAtomic := field.Tag.Get("atomic") == "true"
+		wgslType, ok := lookupWGSLType(fieldTypeName, isAtomic, arrayLen)
 		if !ok {
-			return Struct{}, fmt.Errorf("unhandled Go type: %q", fieldType.String())
-		}
-
-		wgslType, ok := typeMap[wgslTypeName]
-		if !ok {
-			return Struct{}, fmt.Errorf("unhandled WGSL type: %q", wgslTypeName)
-		}
-
-		// If the field has an atomic tag then treat is as atomic<T>.
-		atomicStr := field.Tag.Get("atomic")
-		if atomicStr == "true" {
-			wgslType = makeAtomic(wgslType)
-		}
-		// If the field is an array then treat is as array<T,N>.
-		if arrayLen > 0 {
-			wgslType = makeArray(wgslType, arrayLen)
+			return Struct{}, fmt.Errorf("unhandled type: %q", fieldType.String())
 		}
 
 		if err := validateOffset(field, wgslType); err != nil {
@@ -131,23 +124,9 @@ func NewStruct[T any](name string) (Struct, error) {
 			WGSLType: wgslType,
 		}
 	}
+
+	registeredGoStructs[s.GoName] = s
 	return s, nil
-}
-
-func makeAtomic(t Type) Type {
-	return Type{
-		Name:    TypeName(fmt.Sprintf("atomic<%s>", t.Name)),
-		AlignOf: t.AlignOf,
-		SizeOf:  t.SizeOf,
-	}
-}
-
-func makeArray(t Type, n int) Type {
-	return Type{
-		Name:    TypeName(fmt.Sprintf("array<%s, %d>", t.Name, n)),
-		AlignOf: t.AlignOf,
-		SizeOf:  t.SizeOf * n,
-	}
 }
 
 // TODO: add test coverage for this.
@@ -160,7 +139,7 @@ func validateOffset(field reflect.StructField, wgslType Type) error {
 
 func (s Struct) String() string {
 	var output strings.Builder
-	output.WriteString(fmt.Sprintf("struct %q, size %d\n", s.Name, s.Size))
+	output.WriteString(fmt.Sprintf("struct %q, size %d\n", s.GoName, s.Size))
 	for idx, fName := range s.Fields {
 		f := s.FieldMap[fName]
 		output.WriteString(fmt.Sprintf("  %d: %s at offset %d\n", idx, f.Name, f.Offset))
@@ -188,4 +167,64 @@ func (s *Struct) MustOffsetOf(fieldName string) int {
 		panic("unknown field: " + fieldName)
 	}
 	return int(field.Offset)
+}
+
+func makeGoTypeName(t reflect.Type) GoTypeName {
+	if path := t.PkgPath(); path != "" {
+		return GoTypeName(path + "." + t.Name())
+	}
+	return GoTypeName(t.Name())
+}
+
+func lookupWGSLType(goTypeName GoTypeName, isAtomic bool, arrayLen int) (Type, bool) {
+	wgslType, ok := lookupPrimitiveWGSLType(goTypeName)
+	if !ok {
+		return Type{}, false
+	}
+
+	// If the field has an atomic tag then treat is as atomic<T>.
+	if isAtomic {
+		wgslType = makeAtomic(wgslType)
+	}
+	// If the field is an array then treat is as array<T,N>.
+	if arrayLen > 0 {
+		wgslType = makeArray(wgslType, arrayLen)
+	}
+
+	return wgslType, true
+}
+
+func lookupPrimitiveWGSLType(goTypeName GoTypeName) (Type, bool) {
+	if tn, ok := goToTypeMap[goTypeName]; ok {
+		if wgslType, ok := builtinTypeMap[tn]; ok {
+			return wgslType, true
+		}
+		return Type{}, false
+	}
+	if s, ok := registeredGoStructs[goTypeName]; ok {
+		wgslType := Type{
+			Name:    s.Name,
+			AlignOf: s.Size, // TODO: this should be max(fieldAlignment)
+			SizeOf:  s.Size,
+		}
+		return wgslType, true
+	}
+	fmt.Printf("Couldn't find %q -> %v\n", goTypeName, registeredGoStructs)
+	return Type{}, false
+}
+
+func makeAtomic(t Type) Type {
+	return Type{
+		Name:    TypeName(fmt.Sprintf("atomic<%s>", t.Name)),
+		AlignOf: t.AlignOf,
+		SizeOf:  t.SizeOf,
+	}
+}
+
+func makeArray(t Type, n int) Type {
+	return Type{
+		Name:    TypeName(fmt.Sprintf("array<%s, %d>", t.Name, n)),
+		AlignOf: t.AlignOf,
+		SizeOf:  t.SizeOf * n,
+	}
 }
