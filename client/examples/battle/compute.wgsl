@@ -16,18 +16,6 @@ const bodyTypeNone = 0u;
 const bodyTypeShip = 1u;
 const bodyTypeMissile = 2u;
 
-// TODO: figure out how to bind this.
-struct ContactsContainer {
-  count : atomic<u32>,
-  capacity : u32,
-  elements : array<Contact>,
-}
-
-struct Contact {
-  aIdx : u32,
-  bIdx : u32,
-}
-
 fn addContact(aIdx : u32, bIdx : u32) {
   let contactIdx = atomicAdd(&contacts.count, 1);
   if (contactIdx < contacts.capacity) {

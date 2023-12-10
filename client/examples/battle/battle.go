@@ -88,9 +88,9 @@ type Contact struct {
 }
 
 type ContactsContainer struct {
-	count    uint32
+	count    uint32 `atomic:"true"`
 	capacity uint32
-	contacts [1024]Contact
+	elements [1024]Contact
 }
 
 type Team uint8
@@ -231,6 +231,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	structDefinitions := []wgsltypes.Struct{
 		simParamsStruct,
 		particleStruct,
+		contactStruct,
+		contactsContainerStruct,
 	}
 
 	// Compute
