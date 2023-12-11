@@ -18,6 +18,8 @@ import (
 const (
 	numParticles = 500
 
+	maxContactCount = 1024
+
 	initialVelScale = 100.0
 
 	enableDebugBuffer = false
@@ -89,8 +91,8 @@ type Contact struct {
 
 type ContactsContainer struct {
 	count    uint32 `atomic:"true"`
-	capacity uint32
-	elements [1024]Contact
+	pad      uint32
+	elements [maxContactCount]Contact `runtimeArray:"true"`
 }
 
 type Team uint8

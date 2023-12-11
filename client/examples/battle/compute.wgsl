@@ -4,7 +4,6 @@ struct Particles {
 @binding(0) @group(0) var<uniform> params : SimParams;
 @binding(1) @group(0) var<storage, read> particlesA : Particles;
 @binding(2) @group(0) var<storage, read_write> particlesB : Particles;
-
 @binding(3) @group(0) var<storage, read_write> contacts : ContactsContainer;
 
 const pi = 3.14159265359;
@@ -18,7 +17,7 @@ const bodyTypeMissile = 2u;
 
 fn addContact(aIdx : u32, bIdx : u32) {
   let contactIdx = atomicAdd(&contacts.count, 1);
-  if (contactIdx < contacts.capacity) {
+  if (contactIdx < arrayLength(&contacts.elements)) {
     contacts.elements[contactIdx] = Contact(aIdx, bIdx);
   }
 }
