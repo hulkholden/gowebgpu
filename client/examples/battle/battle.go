@@ -183,7 +183,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
-	particleBuffers := []engine.StorageBuffer{
+	particleBuffers := []engine.GPUBuffer{
 		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
 		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
 	}

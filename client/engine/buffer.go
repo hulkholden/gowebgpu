@@ -7,6 +7,29 @@ import (
 	"github.com/mokiat/wasmgpu"
 )
 
+type GPUBuffer struct {
+	device wasmgpu.GPUDevice
+	buffer wasmgpu.GPUBuffer
+	size   int
+}
+
+type DebugBuffer[T any] struct {
+	GPUBuffer
+}
+
+func (b GPUBuffer) Buffer() wasmgpu.GPUBuffer {
+	return b.buffer
+}
+
+func (b GPUBuffer) BufferSize() wasmgpu.GPUSize64 {
+	return wasmgpu.GPUSize64(b.size)
+}
+
+// TODO: make UniformBuffer generic so we can use `value T` here?
+func (b GPUBuffer) UpdateBuffer(bytes []byte) {
+	b.device.Queue().WriteBuffer(b.buffer, 0, bytes)
+}
+
 func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, data []byte, initContents bool, opts ...BufferOption) wasmgpu.GPUBuffer {
 	desc := wasmgpu.GPUBufferDescriptor{
 		Size:             wasmgpu.GPUSize64(len(data)),
@@ -24,80 +47,46 @@ func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, dat
 	return buffer
 }
 
-type StorageBuffer struct {
-	buffer wasmgpu.GPUBuffer
-	size   int
-}
-
-func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) StorageBuffer {
+func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) GPUBuffer {
 	data := structAsByteSlice(value)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
-	return StorageBuffer{
-		buffer: buffer,
-		size:   len(data),
-	}
-}
-
-func InitStorageBufferSlice[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) StorageBuffer {
-	data := sliceAsBytesSlice(values)
-	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
-	return StorageBuffer{
-		buffer: buffer,
-		size:   len(data),
-	}
-}
-
-func (b StorageBuffer) Buffer() wasmgpu.GPUBuffer {
-	return b.buffer
-}
-
-func (b StorageBuffer) BufferSize() wasmgpu.GPUSize64 {
-	return wasmgpu.GPUSize64(b.size)
-}
-
-type UniformBuffer struct {
-	device wasmgpu.GPUDevice
-	buffer wasmgpu.GPUBuffer
-}
-
-func InitUniformBuffer[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) UniformBuffer {
-	data := structAsByteSlice(value)
-	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsUniform, data, true, opts...)
-	return UniformBuffer{
+	return GPUBuffer{
 		device: device,
 		buffer: buffer,
+		size:   len(data),
 	}
 }
 
-// TODO: make UniformBuffer generic so we can use `value T` here?
-func (b UniformBuffer) UpdateBuffer(bytes []byte) {
-	b.device.Queue().WriteBuffer(b.buffer, 0, bytes)
+func InitStorageBufferSlice[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) GPUBuffer {
+	data := sliceAsBytesSlice(values)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
+	return GPUBuffer{
+		device: device,
+		buffer: buffer,
+		size:   len(data),
+	}
 }
 
-func (b UniformBuffer) Buffer() wasmgpu.GPUBuffer {
-	return b.buffer
-}
-
-type DebugBuffer[T any] struct {
-	buffer wasmgpu.GPUBuffer
-	size   int
+func InitUniformBuffer[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) GPUBuffer {
+	data := structAsByteSlice(value)
+	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsUniform, data, true, opts...)
+	return GPUBuffer{
+		device: device,
+		buffer: buffer,
+		size:   len(data),
+	}
 }
 
 func InitDebugBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...BufferOption) DebugBuffer[T] {
 	data := sliceAsBytesSlice(values)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsMapRead|wasmgpu.GPUBufferUsageFlagsCopyDst, data, false, opts...)
 	return DebugBuffer[T]{
-		buffer: buffer,
-		size:   len(data),
+		GPUBuffer: GPUBuffer{
+			device: device,
+			buffer: buffer,
+			size:   len(data),
+		},
 	}
-}
-
-func (b DebugBuffer[T]) Buffer() wasmgpu.GPUBuffer {
-	return b.buffer
-}
-
-func (b DebugBuffer[T]) BufferSize() wasmgpu.GPUSize64 {
-	return wasmgpu.GPUSize64(b.size)
 }
 
 func (b DebugBuffer[T]) ReadAsync(callback func(data []T)) {
