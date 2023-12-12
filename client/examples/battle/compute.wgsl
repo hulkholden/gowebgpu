@@ -1,10 +1,16 @@
 struct Particles {
   particles : array<Particle>,
 }
+struct Accelerations {
+  accelerations : array<Acceleration>,
+}
 @binding(0) @group(0) var<uniform> params : SimParams;
-@binding(1) @group(0) var<storage, read> particlesA : Particles;
-@binding(2) @group(0) var<storage, read_write> particlesB : Particles;
-@binding(3) @group(0) var<storage, read_write> contacts : ContactsContainer;
+
+// TODO: is there any performance difference binding these as read only when
+// used in the different entry points?
+@binding(1) @group(0) var<storage, read_write> gParticles : Particles;
+@binding(2) @group(0) var<storage, read_write> gAccelerations : Accelerations;
+@binding(3) @group(0) var<storage, read_write> gContacts : ContactsContainer;
 
 const pi = 3.14159265359;
 const twoPi = 2 * pi;
@@ -16,15 +22,10 @@ const bodyTypeShip = 1u;
 const bodyTypeMissile = 2u;
 
 fn addContact(aIdx : u32, bIdx : u32) {
-  let contactIdx = atomicAdd(&contacts.count, 1);
-  if (contactIdx < arrayLength(&contacts.elements)) {
-    contacts.elements[contactIdx] = Contact(aIdx, bIdx);
+  let contactIdx = atomicAdd(&gContacts.count, 1);
+  if (contactIdx < arrayLength(&gContacts.elements)) {
+    gContacts.elements[contactIdx] = Contact(aIdx, bIdx);
   }
-}
-
-struct Control {
-  linearAcc : vec2f,
-  angularAcc : f32,
 }
 
 struct ReferenceFrame {
@@ -76,18 +77,40 @@ fn modReplacement(x : f32, y : f32) -> f32 {
 }
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+fn computeAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   let index = GlobalInvocationID.x;
-  var particle = particlesA.particles[index];
-
+  let particle = gParticles.particles[index];
   let f = particleReferenceFrame(particle);
 
-  var control = Control();
+  var acc = Acceleration();
   switch particleType(particle) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      control = flock(f, particleTeam(particle), index);
+      acc = flock(f, particleTeam(particle), index);
+    }
+    case bodyTypeMissile: {
+      if (particle.targetIdx < 0) {
+        break;
+      }
+      acc = updateMissile(f, index, particle.targetIdx);
+    }
+    default: {
+    }
+  }
+  gAccelerations.accelerations[index] = acc;
+}
+
+@compute @workgroup_size(64)
+fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  let index = GlobalInvocationID.x;
+  var particle = gParticles.particles[index];
+  let acc = gAccelerations.accelerations[index];
+
+  switch particleType(particle) {
+    case bodyTypeNone: {
+    }
+    case bodyTypeShip: {
     }
     case bodyTypeMissile: {
       if (particle.targetIdx < 0) {
@@ -97,15 +120,15 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         }
       }
       // Reset on contact.
-      let targetP = particlesA.particles[particle.targetIdx];
-      if (particle.age > params.maxMissileAge || distance(particle.pos, targetP.pos) < 10.0) {
+      let targetP = gParticles.particles[particle.targetIdx];
+      let collide = distance(particle.pos, targetP.pos) < 10.0;
+      if (particle.age > params.maxMissileAge || collide) {
         particle.pos = 2.0 * (rand22(particle.pos) - 0.5) * 1000.0;
         particle.vel = 2.0 * (rand22(particle.vel) - 0.5) * 0.0;
         particle.angle = 0.0;
         particle.angularVel = 0.0;
         particle.age = 0.0;
       }
-      control = updateMissile(f, index, particle.targetIdx);
     }
     default: {
     }
@@ -114,10 +137,10 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   // kinematic update
   particle.age += params.deltaT;
 
-  particle.vel += control.linearAcc * params.deltaT;
+  particle.vel += acc.linearAcc * params.deltaT;
   particle.pos += particle.vel * params.deltaT;
 
-  particle.angularVel += control.angularAcc * params.deltaT;
+  particle.angularVel += acc.angularAcc * params.deltaT;
   particle.angle = normalizeAngle(particle.angle + particle.angularVel * params.deltaT);
 
   // Bounce off the boundary.
@@ -133,7 +156,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   }
 
   // Write back
-  particlesB.particles[index] = particle;
+  gParticles.particles[index] = particle;
 }
 
 fn findTarget(particle : Particle) -> i32 {
@@ -146,8 +169,8 @@ fn findTarget(particle : Particle) -> i32 {
 	let wantType = select(bodyTypeShip, bodyTypeMissile, selfTeam == 2);
 	var closestIdx = -1;
 	var closestDist = 0.0;
-  for (var idx = 0u; idx < arrayLength(&particlesA.particles); idx++) {
-    let other = particlesA.particles[idx];
+  for (var idx = 0u; idx < arrayLength(&gParticles.particles); idx++) {
+    let other = gParticles.particles[idx];
 		if (particleTeam(other) == selfTeam || particleType(other) != wantType) {
 			continue;
 		}
@@ -172,15 +195,15 @@ fn particleTeam(particle : Particle) -> u32 {
   return particle.metadata & 0xff;
 }
 
-fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Control {
+fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Acceleration {
   var cMass = vec2(0.0);
   var cVel = vec2(0.0);
   var colVel = vec2(0.0);
   var cMassCount = 0u;
   var cVelCount = 0u;
 
-  for (var i = 0u; i < arrayLength(&particlesA.particles); i++) {
-    let other = particlesA.particles[i];
+  for (var i = 0u; i < arrayLength(&gParticles.particles); i++) {
+    let other = gParticles.particles[i];
     if (i == selfIdx || particleType(other) != bodyTypeShip) {
       continue;
     }
@@ -209,20 +232,21 @@ fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Control {
     cVel /= f32(cVelCount);
   }
   
+  var acc = Acceleration();
   let dVel = (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
-  let linAcc = dVel / params.deltaT;
+  acc.linearAcc = dVel / params.deltaT;
 
   // Set the desired reference frame to the current state, attempting to orient with the velocity vector.
   // TODO: we could ignore linear component of this - maybe the compiler does that for us?
   let desired = ReferenceFrame(current.pos, current.vel, angleOf(current.vel, current.angle), 0.0);
   let rel = referenceFrameSub(desired, current);
-  let angAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
+  acc.angularAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
 
-  return Control(linAcc, angAcc);
+  return acc;
 }
 
-fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Control {
-  let targetP = particlesA.particles[targetIdx];
+fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Acceleration {
+  let targetP = gParticles.particles[targetIdx];
   let targetF = particleReferenceFrame(targetP);
 
   let targetVec = current.pos - targetF.pos;
@@ -260,10 +284,10 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Co
     localLinAcc *= params.maxAcc / l;
   }
 
-  let linAcc = rotVec(localLinAcc, current.angle);
-  let angAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
-
-  return Control(linAcc, angAcc);
+  var acc = Acceleration();
+  acc.linearAcc = rotVec(localLinAcc, current.angle);
+  acc.angularAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
+  return acc;
 }
 
 // A version of https://en.wikipedia.org/wiki/Proportional_navigation simplified for 2D.

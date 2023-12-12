@@ -84,6 +84,12 @@ func (p Particle) Team() Team {
 	return Team(p.metadata & 0xff)
 }
 
+type Acceleration struct {
+	linearAcc  vmath.V2
+	angularAcc float32
+	pad        uint32
+}
+
 type Contact struct {
 	aIdx uint32
 	bIdx uint32
@@ -131,6 +137,7 @@ type Vertex struct {
 var (
 	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
 	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
+	accelerationStruct      = wgsltypes.MustRegisterStruct[Acceleration]()
 	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
 	contactStruct           = wgsltypes.MustRegisterStruct[Contact]()
 	contactsContainerStruct = wgsltypes.MustRegisterStruct[ContactsContainer]()
@@ -185,10 +192,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
-	particleBuffers := []engine.GPUBuffer{
-		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
-		engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...),
-	}
+	particleBuffer := engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...)
+	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const particleBufferIdx = 0
@@ -205,6 +210,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
 	vertexBuffers := engine.NewVertexBuffers(bufDefs, vtxAttrs)
+	// TODO: pass into constructor?
+	vertexBuffers.Buffers[particleBufferIdx] = particleBuffer.Buffer()
+	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.Buffer()
 
 	spriteShaderModule := engine.InitShaderModule(device, renderShaderCode, nil)
 	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
@@ -233,32 +241,39 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	structDefinitions := []wgsltypes.Struct{
 		simParamsStruct,
 		particleStruct,
+		accelerationStruct,
 		contactStruct,
 		contactsContainerStruct,
 	}
 
 	// Compute
-	updateSpritesShaderModule := engine.InitShaderModule(device, computeShaderCode, structDefinitions)
-	computePipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
+	computeShaderModule := engine.InitShaderModule(device, computeShaderCode, structDefinitions)
+	computeAccelerationPipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
-			Module:     updateSpritesShaderModule,
-			EntryPoint: "main",
+			Module:     computeShaderModule,
+			EntryPoint: "computeAcceleration",
 		},
 	}
-	computePipeline := device.CreateComputePipeline(computePipelineDescriptor)
+	computeAccelerationPipeline := device.CreateComputePipeline(computeAccelerationPipelineDescriptor)
 
-	particleBindGroups := make([]wasmgpu.GPUBindGroup, 2)
-	for i := 0; i < 2; i++ {
-		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
-			Layout: computePipeline.GetBindGroupLayout(0),
-			Entries: engine.MakeGPUBindingGroupEntries(
-				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].Buffer()},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].Buffer()},
-			),
-		})
+	applyAccelerationPipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
+		// Layout: "auto",
+		Compute: wasmgpu.GPUProgrammableStage{
+			Module:     computeShaderModule,
+			EntryPoint: "applyAcceleration",
+		},
 	}
+	applyAccelerationPipeline := device.CreateComputePipeline(applyAccelerationPipelineDescriptor)
+
+	computeBindGroup := device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
+		Layout: computeAccelerationPipeline.GetBindGroupLayout(0),
+		Entries: engine.MakeGPUBindingGroupEntries(
+			wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
+		),
+	})
 
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
 		ColorAttachments: []wasmgpu.GPURenderPassColorAttachment{
@@ -279,19 +294,21 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		debugBuffer = engine.InitDebugBuffer(device, debugData)
 	}
 
-	t := 0
 	update := func() {
 		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
 		commandEncoder := device.CreateCommandEncoder()
 
-		// Flip the buffer used for rendering.
-		vertexBuffers.Buffers[particleBufferIdx] = particleBuffers[(t+1)%2].Buffer()
-		vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.Buffer()
-
 		{
 			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
-			passEncoder.SetPipeline(computePipeline)
-			passEncoder.SetBindGroup(0, particleBindGroups[t%2], nil)
+			passEncoder.SetPipeline(computeAccelerationPipeline)
+			passEncoder.SetBindGroup(0, computeBindGroup, nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
+			passEncoder.End()
+		}
+		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
+			passEncoder.SetPipeline(applyAccelerationPipeline)
+			passEncoder.SetBindGroup(0, computeBindGroup, nil)
 			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
 			passEncoder.End()
 		}
@@ -303,7 +320,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			passEncoder.End()
 		}
 		if enableDebugBuffer {
-			commandEncoder.CopyBufferToBuffer(particleBuffers[(t+1)%2].Buffer(), 0, debugBuffer.Buffer(), 0, debugBuffer.BufferSize())
+			commandEncoder.CopyBufferToBuffer(particleBuffer.Buffer(), 0, debugBuffer.Buffer(), 0, debugBuffer.BufferSize())
 		}
 
 		device.Queue().Submit([]wasmgpu.GPUCommandBuffer{
@@ -315,8 +332,6 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 				fmt.Printf("Paticles[1]]: %+v\n", particles[1])
 			})
 		}
-
-		t++
 	}
 
 	engine.InitRenderCallback(update)
