@@ -47,18 +47,23 @@ type SimParams struct {
 	avoidScale    float32
 	cVelScale     float32
 
-	maxMissileAge float32
+	maxMissileAge        float32
+	missileCollisionDist float32
 
 	// boundaryBounceFactor is the velocity preserved after colliding with the boundary.
 	boundaryBounceFactor float32
 
-	maxSpeed  float32
-	maxAcc    float32
-	maxAngAcc float32
+	maxShipSpeed float32
+
+	maxMissileSpeed  float32
+	maxMissileAcc    float32
+	maxMissileAngAcc float32
 
 	// TODO: need to ensure struct is multiple of alignment size (8 for V2).
 	// pad uint32
 }
+
+const kParticleFlagHit = 1
 
 type Particle struct {
 	pos        vmath.V2
@@ -71,9 +76,9 @@ type Particle struct {
 	// TODO: compress these down. Pack age in the metadata word?
 	targetIdx int32
 	age       float32
+	flags     uint32 `atomic:"true"`
 
 	debugVal float32
-	pad      float32
 }
 
 func (p Particle) BodyType() BodyType {
@@ -166,11 +171,14 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		avoidScale: 0.05,
 		cVelScale:  0.005,
 
-		maxMissileAge: 10.0,
+		maxMissileAge:        10.0,
+		missileCollisionDist: 10.0,
 
-		maxSpeed:  100.0,
-		maxAcc:    150.0,
-		maxAngAcc: 16.0,
+		maxShipSpeed: 100.0,
+
+		maxMissileSpeed:  150.0,
+		maxMissileAcc:    150.0,
+		maxMissileAngAcc: 16.0,
 
 		boundaryBounceFactor: 0.95,
 	}
@@ -194,6 +202,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	particleBuffer := engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
+
+	contacts := ContactsContainer{}
+	contactsBuffer := engine.InitStorageBufferStruct(device, contacts, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const particleBufferIdx = 0
@@ -248,23 +259,34 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	// Compute
 	computeShaderModule := engine.InitShaderModule(device, computeShaderCode, structDefinitions)
-	computeAccelerationPipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
+	computeAccelerationPipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
 			Module:     computeShaderModule,
 			EntryPoint: "computeAcceleration",
 		},
-	}
-	computeAccelerationPipeline := device.CreateComputePipeline(computeAccelerationPipelineDescriptor)
-
-	applyAccelerationPipelineDescriptor := wasmgpu.GPUComputePipelineDescriptor{
+	})
+	applyAccelerationPipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
 			Module:     computeShaderModule,
 			EntryPoint: "applyAcceleration",
 		},
-	}
-	applyAccelerationPipeline := device.CreateComputePipeline(applyAccelerationPipelineDescriptor)
+	})
+	computeCollisionsPipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
+		// Layout: "auto",
+		Compute: wasmgpu.GPUProgrammableStage{
+			Module:     computeShaderModule,
+			EntryPoint: "computeCollisions",
+		},
+	})
+	updateMissileLifecyclePipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
+		// Layout: "auto",
+		Compute: wasmgpu.GPUProgrammableStage{
+			Module:     computeShaderModule,
+			EntryPoint: "updateMissileLifecycle",
+		},
+	})
 
 	computeBindGroup := device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 		Layout: computeAccelerationPipeline.GetBindGroupLayout(0),
@@ -272,6 +294,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
 		),
 	})
 
@@ -298,18 +321,35 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
 		commandEncoder := device.CreateCommandEncoder()
 
+		commandEncoder.ClearBuffer(contactsBuffer.Buffer(), 0, contactsBuffer.BufferSize())
+
+		workgroups := (numParticles + 63) / 64
 		{
 			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
 			passEncoder.SetPipeline(computeAccelerationPipeline)
 			passEncoder.SetBindGroup(0, computeBindGroup, nil)
-			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(workgroups), 0, 0)
 			passEncoder.End()
 		}
 		{
 			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
 			passEncoder.SetPipeline(applyAccelerationPipeline)
 			passEncoder.SetBindGroup(0, computeBindGroup, nil)
-			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32((numParticles+63)/64), 0, 0)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(workgroups), 0, 0)
+			passEncoder.End()
+		}
+		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
+			passEncoder.SetPipeline(computeCollisionsPipeline)
+			passEncoder.SetBindGroup(0, computeBindGroup, nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(workgroups), 0, 0)
+			passEncoder.End()
+		}
+		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
+			passEncoder.SetPipeline(updateMissileLifecyclePipeline)
+			passEncoder.SetBindGroup(0, computeBindGroup, nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(workgroups), 0, 0)
 			passEncoder.End()
 		}
 		{

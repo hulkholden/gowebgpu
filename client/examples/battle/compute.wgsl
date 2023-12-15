@@ -21,6 +21,8 @@ const bodyTypeNone = 0u;
 const bodyTypeShip = 1u;
 const bodyTypeMissile = 2u;
 
+const particleFlagHit = 1u;
+
 fn addContact(aIdx : u32, bIdx : u32) {
   let contactIdx = atomicAdd(&gContacts.count, 1);
   if (contactIdx < arrayLength(&gContacts.elements)) {
@@ -76,24 +78,32 @@ fn modReplacement(x : f32, y : f32) -> f32 {
   return x - (y * floor(x/y));
 }
 
+fn bogusReferences() {
+  // Chrome seems to silently discard unreferenced resources then complain when
+  // they're provided in the bind group.
+  let dummy0 = &params;
+  let dummy1 = &gParticles;
+  let dummy2 = &gAccelerations;
+  let dummy3 = &gContacts;
+}
+
 @compute @workgroup_size(64)
 fn computeAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  let index = GlobalInvocationID.x;
-  let particle = gParticles.particles[index];
-  let f = particleReferenceFrame(particle);
+  bogusReferences();
 
+  let index = GlobalInvocationID.x;
+  let particle = &gParticles.particles[index];
   var acc = Acceleration();
-  switch particleType(particle) {
+  switch particleType(index) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      acc = flock(f, particleTeam(particle), index);
+      acc = flock(index);
     }
     case bodyTypeMissile: {
-      if (particle.targetIdx < 0) {
-        break;
+      if ((*particle).targetIdx >= 0) {
+        acc = updateMissile(index, u32((*particle).targetIdx));
       }
-      acc = updateMissile(f, index, particle.targetIdx);
     }
     default: {
     }
@@ -103,65 +113,97 @@ fn computeAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<
 
 @compute @workgroup_size(64)
 fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  bogusReferences();
+
   let index = GlobalInvocationID.x;
-  var particle = gParticles.particles[index];
+  let particle = &gParticles.particles[index];
   let acc = gAccelerations.accelerations[index];
 
-  switch particleType(particle) {
+  // kinematic update
+  (*particle).age += params.deltaT;
+
+  (*particle).vel += acc.linearAcc * params.deltaT;
+  (*particle).pos += (*particle).vel * params.deltaT;
+
+  (*particle).angularVel += acc.angularAcc * params.deltaT;
+  (*particle).angle = normalizeAngle((*particle).angle + (*particle).angularVel * params.deltaT);
+
+  // Bounce off the boundary.
+  let under = ((*particle).pos < params.minBound) & ((*particle).vel < vec2());
+  let over = ((*particle).pos > params.maxBound) & ((*particle).vel > vec2());
+  (*particle).vel = select((*particle).vel, -(*particle).vel * params.boundaryBounceFactor, under | over);
+  (*particle).pos = clamp((*particle).pos, params.minBound, params.maxBound);
+
+  if (particleType(index) == bodyTypeShip) {
+    // clamp velocity for a more pleasing simulation
+    (*particle).vel = normalize((*particle).vel) * clamp(length((*particle).vel), 0.0, params.maxShipSpeed);
+  }
+
+  // Write back
+  //gParticles.particles[index] = particle;
+}
+
+@compute @workgroup_size(64)
+fn computeCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  bogusReferences();
+  let index = GlobalInvocationID.x;
+
+  if (particleType(index) == bodyTypeMissile) {
+    let particle = &gParticles.particles[index];
+    let targetIdx = (*particle).targetIdx;
+    if (targetIdx >= 0) {
+      let targetP = &gParticles.particles[targetIdx];
+      let collide = distance((*particle).pos, (*targetP).pos) < params.missileCollisionDist;
+      if (collide) {
+        atomicOr(&(*particle).flags, particleFlagHit);
+        atomicOr(&(*targetP).flags, particleFlagHit);
+      }
+    }
+  }
+}
+
+@compute @workgroup_size(64)
+fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  bogusReferences();
+
+  let index = GlobalInvocationID.x;
+  let particle = &gParticles.particles[index];
+
+  switch particleType(index) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
+      if ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0) {
+        (*particle).col = 0xffff00ffu;
+      }
     }
     case bodyTypeMissile: {
-      if (particle.targetIdx < 0) {
-        particle.targetIdx = findTarget(particle);
-        if (particle.targetIdx < 0) {
+      if ((*particle).targetIdx < 0) {
+        (*particle).targetIdx = findTarget(index);
+        if ((*particle).targetIdx < 0) {
           break;
         }
       }
       // Reset on contact.
-      let targetP = gParticles.particles[particle.targetIdx];
-      let collide = distance(particle.pos, targetP.pos) < 10.0;
-      if (particle.age > params.maxMissileAge || collide) {
-        particle.pos = 2.0 * (rand22(particle.pos) - 0.5) * 1000.0;
-        particle.vel = 2.0 * (rand22(particle.vel) - 0.5) * 0.0;
-        particle.angle = 0.0;
-        particle.angularVel = 0.0;
-        particle.age = 0.0;
+      if ((*particle).age > params.maxMissileAge || ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0)) {
+        (*particle).pos = 2.0 * (rand22((*particle).pos) - 0.5) * 1000.0;
+        (*particle).vel = 2.0 * (rand22((*particle).vel) - 0.5) * 0.0;
+        (*particle).angle = 0.0;
+        (*particle).angularVel = 0.0;
+        (*particle).age = 0.0;
+        atomicStore(&(*particle).flags, 0);
+        //gParticles.particles[index] = particle;
       }
     }
     default: {
     }
   }
-
-  // kinematic update
-  particle.age += params.deltaT;
-
-  particle.vel += acc.linearAcc * params.deltaT;
-  particle.pos += particle.vel * params.deltaT;
-
-  particle.angularVel += acc.angularAcc * params.deltaT;
-  particle.angle = normalizeAngle(particle.angle + particle.angularVel * params.deltaT);
-
-  // Bounce off the boundary.
-  let under = (particle.pos < params.minBound) & (particle.vel < vec2());
-  let over = (particle.pos > params.maxBound) & (particle.vel > vec2());
-  particle.vel = select(particle.vel, -particle.vel * params.boundaryBounceFactor, under | over);
-  particle.pos = clamp(particle.pos, params.minBound, params.maxBound);
-
-  if (particleType(particle) == bodyTypeShip) {
-    // clamp velocity for a more pleasing simulation
-    // TODO: make upper bound a param.
-    particle.vel =  normalize(particle.vel) * clamp(length(particle.vel), 0.0, 100.0);
-  }
-
-  // Write back
-  gParticles.particles[index] = particle;
 }
 
-fn findTarget(particle : Particle) -> i32 {
-	let selfTeam = particleTeam(particle);
-  let selfType = particleType(particle);
+fn findTarget(selfIdx : u32) -> i32 {
+  let particle = &gParticles.particles[selfIdx];
+	let selfTeam = particleTeam(selfIdx);
+  let selfType = particleType(selfIdx);
 	if (selfType != bodyTypeMissile) {
 		return -1;
 	}
@@ -169,52 +211,57 @@ fn findTarget(particle : Particle) -> i32 {
 	let wantType = select(bodyTypeShip, bodyTypeMissile, selfTeam == 2);
 	var closestIdx = -1;
 	var closestDist = 0.0;
-  for (var idx = 0u; idx < arrayLength(&gParticles.particles); idx++) {
-    let other = gParticles.particles[idx];
-		if (particleTeam(other) == selfTeam || particleType(other) != wantType) {
+  for (var otherIdx = 0u; otherIdx < arrayLength(&gParticles.particles); otherIdx++) {
+    let other = &gParticles.particles[otherIdx];
+		if (selfIdx == otherIdx || particleTeam(otherIdx) == selfTeam || particleType(otherIdx) != wantType) {
 			continue;
 		}
-    let dist = distance(particle.pos, other.pos);
+    let dist = distance((*particle).pos, (*other).pos);
 		if (closestIdx < 0 || dist < closestDist) {
 			closestDist = dist;
-			closestIdx = i32(idx);
+			closestIdx = i32(otherIdx);
 		}
 	}
 	return closestIdx;
 }
 
-fn particleReferenceFrame(particle : Particle) -> ReferenceFrame {
-  return ReferenceFrame(particle.pos, particle.vel, particle.angle, particle.angularVel);
+fn particleReferenceFrame(index : u32) -> ReferenceFrame {
+  let p = &gParticles.particles[index];
+  return ReferenceFrame((*p).pos, (*p).vel, (*p).angle, (*p).angularVel);
 }
 
-fn particleType(particle : Particle) -> u32 {
-  return (particle.metadata >> 8) & 0xff;
+fn particleType(index : u32) -> u32 {
+  let p = &gParticles.particles[index];
+  return ((*p).metadata >> 8) & 0xff;
 }
 
-fn particleTeam(particle : Particle) -> u32 {
-  return particle.metadata & 0xff;
+fn particleTeam(index : u32) -> u32 {
+  let p = &gParticles.particles[index];
+  return (*p).metadata & 0xff;
 }
 
-fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Acceleration {
+fn flock(selfIdx : u32) -> Acceleration {
   var cMass = vec2(0.0);
   var cVel = vec2(0.0);
   var colVel = vec2(0.0);
   var cMassCount = 0u;
   var cVelCount = 0u;
 
-  for (var i = 0u; i < arrayLength(&gParticles.particles); i++) {
-    let other = gParticles.particles[i];
-    if (i == selfIdx || particleType(other) != bodyTypeShip) {
+  let selfTeam = particleTeam(selfIdx);
+  let current = particleReferenceFrame(selfIdx);
+  for (var otherIdx = 0u; otherIdx < arrayLength(&gParticles.particles); otherIdx++) {
+    let other = &gParticles.particles[otherIdx];
+    if (otherIdx == selfIdx || particleType(otherIdx) != bodyTypeShip) {
       continue;
     }
-    let pos = other.pos.xy;
-    let vel = other.vel.xy;
+    let pos = (*other).pos.xy;
+    let vel = (*other).vel.xy;
     let dPos = pos - current.pos;
     let dist = length(dPos);
     if (dist < params.avoidDistance) {
       colVel -= dPos;
     }
-    if (particleTeam(other) == selfTeam) {
+    if (particleTeam(otherIdx) == selfTeam) {
       if (dist < params.cMassDistance) {
         cMass += pos;
         cMassCount++;
@@ -245,9 +292,9 @@ fn flock(current : ReferenceFrame, selfTeam : u32, selfIdx : u32) -> Acceleratio
   return acc;
 }
 
-fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Acceleration {
-  let targetP = gParticles.particles[targetIdx];
-  let targetF = particleReferenceFrame(targetP);
+fn updateMissile(selfIdx : u32, targetIdx : u32) -> Acceleration {
+  let current = particleReferenceFrame(selfIdx);
+  let targetF = particleReferenceFrame(targetIdx);
 
   let targetVec = current.pos - targetF.pos;
   let targetDist = length(targetVec);
@@ -266,22 +313,22 @@ fn updateMissile(current : ReferenceFrame, selfIdx : u32, targetIdx : i32) -> Ac
   var localLinAcc = vec2f(0, 0);
   // Apply proportional navigation to track towards the target.
   localLinAcc.x = proNav2D(localRel.pos, localRel.vel);
-	// Accelerate forward as fast as possible while staying under MaxSpeed (with respect to target).
-  if (params.maxSpeed == 0) {
-    localLinAcc.y = params.maxAcc;
+	// Accelerate forward as fast as possible while staying under maxMissileSpeed (with respect to target).
+  if (params.maxMissileSpeed == 0) {
+    localLinAcc.y = params.maxMissileAcc;
   } else {
     // Relative velocity is negative as we're closing on the target.
     let speed = -localRel.vel.y;
-    if (speed < params.maxSpeed) {
-      let maxAcc = min((params.maxSpeed - speed) / params.deltaT, params.maxAcc);
-      localLinAcc.y = maxAcc;
+    if (speed < params.maxMissileSpeed) {
+      let maxMissileAcc = min((params.maxMissileSpeed - speed) / params.deltaT, params.maxMissileAcc);
+      localLinAcc.y = maxMissileAcc;
     }
   }
 
   // Limit acceleration
   let l = length(localLinAcc);
-  if (l > params.maxAcc) {
-    localLinAcc *= params.maxAcc / l;
+  if (l > params.maxMissileAcc) {
+    localLinAcc *= params.maxMissileAcc / l;
   }
 
   var acc = Acceleration();
@@ -300,15 +347,15 @@ fn perpDot(a: vec2f, b: vec2f) -> f32 {
 }
 
 fn computeTurnAcceleration(relAng : f32, relAngVel : f32) -> f32 {
-  let maxAcc = params.maxAngAcc;
+  let maxMissileAcc = params.maxMissileAngAcc;
 	// Compute the maximum velocity we can turn at and still stop in time.
 	// Given v^2 = u^2 + 2as, assuming v=0 then u = sqrt(-2as).
 	// The most we can accelerate in this frame is (sqrt(2as)-u)/t.
 	// https://physics.stackexchange.com/questions/312692.
   let absAngDiff = abs(relAng);
   let absAngSign = sign(relAng);
-	let maxBrakingVel = sqrt(2.0 * maxAcc * absAngDiff) * absAngSign;
-	return clamp((maxBrakingVel + relAngVel) / params.deltaT, -maxAcc, maxAcc);
+	let maxBrakingVel = sqrt(2.0 * maxMissileAcc * absAngDiff) * absAngSign;
+	return clamp((maxBrakingVel + relAngVel) / params.deltaT, -maxMissileAcc, maxMissileAcc);
 }
 
 // https://gist.github.com/munrocket/236ed5ba7e409b8bdf1ff6eca5dcdc39
