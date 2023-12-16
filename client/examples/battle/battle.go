@@ -202,9 +202,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	particleBuffer := engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
-
-	contacts := ContactsContainer{}
-	contactsBuffer := engine.InitStorageBufferStruct(device, contacts, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
+	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const particleBufferIdx = 0
