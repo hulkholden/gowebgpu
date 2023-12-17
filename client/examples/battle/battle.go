@@ -65,13 +65,16 @@ type SimParams struct {
 
 const kParticleFlagHit = 1
 
-type Particle struct {
+type Body struct {
 	pos        vmath.V2
 	vel        vmath.V2
 	angle      float32
 	angularVel float32
-	col        uint32
-	metadata   uint32
+}
+
+type Particle struct {
+	col      uint32
+	metadata uint32
 
 	// TODO: compress these down. Pack age in the metadata word?
 	targetIdx int32
@@ -141,6 +144,7 @@ type Vertex struct {
 
 var (
 	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
+	bodyStruct              = wgsltypes.MustRegisterStruct[Body]()
 	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
 	accelerationStruct      = wgsltypes.MustRegisterStruct[Acceleration]()
 	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
@@ -193,33 +197,35 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
-	initialParticleData := initParticleData(numParticles, simParams)
-	particleBufferOpts := []engine.BufferOption{
-		engine.WithVertexUsage(),
-	}
+	initialBodyData, initialParticleData := initParticleData(numParticles, simParams)
+	particleBufferOpts := []engine.BufferOption{engine.WithVertexUsage()}
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
+	bodyBuffer := engine.InitStorageBufferSlice(device, initialBodyData, particleBufferOpts...)
 	particleBuffer := engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
 	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
-	const particleBufferIdx = 0
-	const vertexBufferIdx = 1
+	const bodyBufferIdx = 0
+	const particleBufferIdx = 1
+	const vertexBufferIdx = 2
 
 	bufDefs := []engine.BufferDescriptor{
+		{Struct: &bodyStruct, Instanced: true},
 		{Struct: &particleStruct, Instanced: true},
 		{Struct: &vertexStruct},
 	}
 	vtxAttrs := []engine.VertexAttribute{
-		{BufferIndex: particleBufferIdx, FieldName: "pos"},
-		{BufferIndex: particleBufferIdx, FieldName: "angle"},
+		{BufferIndex: bodyBufferIdx, FieldName: "pos"},
+		{BufferIndex: bodyBufferIdx, FieldName: "angle"},
 		{BufferIndex: particleBufferIdx, FieldName: "col"},
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
 	vertexBuffers := engine.NewVertexBuffers(bufDefs, vtxAttrs)
 	// TODO: pass into constructor?
+	vertexBuffers.Buffers[bodyBufferIdx] = bodyBuffer.Buffer()
 	vertexBuffers.Buffers[particleBufferIdx] = particleBuffer.Buffer()
 	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.Buffer()
 
@@ -249,6 +255,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	structDefinitions := []wgsltypes.Struct{
 		simParamsStruct,
+		bodyStruct,
 		particleStruct,
 		accelerationStruct,
 		contactStruct,
@@ -290,6 +297,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		Layout: computeAccelerationPipeline.GetBindGroupLayout(0),
 		Entries: engine.MakeGPUBindingGroupEntries(
 			wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: bodyBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
@@ -376,7 +384,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initParticleData(n int, params SimParams) []Particle {
+func initParticleData(n int, params SimParams) ([]Body, []Particle) {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 
 	type particleChoice struct {
@@ -390,12 +398,13 @@ func initParticleData(n int, params SimParams) []Particle {
 		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 2}, 1), // AntiMissile
 	)
 
-	data := make([]Particle, n)
+	bs := make([]Body, n)
+	ps := make([]Particle, n)
 	for i := 0; i < n; i++ {
-		data[i].pos = randomLocation(r, params)
-		data[i].vel = randomVelocity(r)
-		data[i].angle = 2 * (rand.Float32() - 0.5) * 3.141
-		data[i].angularVel = (rand.Float32() - 0.5) * 1
+		bs[i].pos = randomLocation(r, params)
+		bs[i].vel = randomVelocity(r)
+		bs[i].angle = 2 * (rand.Float32() - 0.5) * 3.141
+		bs[i].angularVel = (rand.Float32() - 0.5) * 1
 
 		choice := chooser.Pick()
 
@@ -410,11 +419,11 @@ func initParticleData(n int, params SimParams) []Particle {
 		// 	data[i].vel = vmath.NewV2(0, 0)
 		// }
 
-		data[i].metadata = makeMeta(choice.bodyType, choice.team)
-		data[i].col = uint32(choice.team.Color())
-		data[i].targetIdx = -1
+		ps[i].metadata = makeMeta(choice.bodyType, choice.team)
+		ps[i].col = uint32(choice.team.Color())
+		ps[i].targetIdx = -1
 	}
-	return data
+	return bs, ps
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {
