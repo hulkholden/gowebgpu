@@ -34,23 +34,15 @@ fn addContact(aIdx : u32, bIdx : u32) {
   }
 }
 
-struct ReferenceFrame {
-  pos : vec2f,
-  vel : vec2f,
-
-  angle : f32,
-  angularVel : f32,
+fn bodySub(a : Body, b : Body) -> Body {
+  return Body(a.pos - b.pos, a.vel - b.vel, angleDiff(a.angle, b.angle), a.angularVel - b.angularVel);
 }
 
-fn referenceFrameSub(a : ReferenceFrame, b : ReferenceFrame) -> ReferenceFrame {
-  return ReferenceFrame(a.pos - b.pos, a.vel - b.vel, angleDiff(a.angle, b.angle), a.angularVel - b.angularVel);
-}
-
-fn referenceFrameRotate(a : ReferenceFrame, angle : f32) -> ReferenceFrame {
+fn bodyRotate(a : Body, angle : f32) -> Body {
   let c = cos(angle);
   let s = sin(angle);
   let transform = mat2x2f(vec2f(c, -s), vec2f(s, c));
-  return ReferenceFrame(a.pos * transform, a.vel * transform, a.angle + angle, a.angularVel);
+  return Body(a.pos * transform, a.vel * transform, a.angle + angle, a.angularVel);
 }
 
 fn rotVec(v : vec2f, a : f32) -> vec2f {
@@ -235,11 +227,6 @@ fn findTarget(selfIdx : u32) -> i32 {
 	return closestIdx;
 }
 
-fn bodyReferenceFrame(index : u32) -> ReferenceFrame {
-  let b = gBodies.bodies[index];
-  return ReferenceFrame(b.pos, b.vel, b.angle, b.angularVel);
-}
-
 fn particleType(index : u32) -> u32 {
   let p = &gParticles.particles[index];
   return ((*p).metadata >> 8) & 0xff;
@@ -258,7 +245,7 @@ fn flock(selfIdx : u32) -> Acceleration {
   var cVelCount = 0u;
 
   let selfTeam = particleTeam(selfIdx);
-  let current = bodyReferenceFrame(selfIdx);
+  let current = gBodies.bodies[selfIdx];
   for (var otherIdx = 0u; otherIdx < arrayLength(&gBodies.bodies); otherIdx++) {
     if (otherIdx == selfIdx || particleType(otherIdx) != bodyTypeShip) {
       continue;
@@ -295,16 +282,16 @@ fn flock(selfIdx : u32) -> Acceleration {
 
   // Set the desired reference frame to the current state, attempting to orient with the velocity vector.
   // TODO: we could ignore linear component of this - maybe the compiler does that for us?
-  let desired = ReferenceFrame(current.pos, current.vel, angleOf(current.vel, current.angle), 0.0);
-  let rel = referenceFrameSub(desired, current);
+  let desired = Body(current.pos, current.vel, angleOf(current.vel, current.angle), 0.0);
+  let rel = bodySub(desired, current);
   acc.angularAcc = computeTurnAcceleration(rel.angle, rel.angularVel);
 
   return acc;
 }
 
 fn updateMissile(selfIdx : u32, targetIdx : u32) -> Acceleration {
-  let current = bodyReferenceFrame(selfIdx);
-  let targetF = bodyReferenceFrame(targetIdx);
+  let current = gBodies.bodies[selfIdx];
+  let targetF = gBodies.bodies[targetIdx];
 
   let targetVec = current.pos - targetF.pos;
   let targetDist = length(targetVec);
@@ -314,11 +301,11 @@ fn updateMissile(selfIdx : u32, targetIdx : u32) -> Acceleration {
   let desiredDist = clamp(targetDist, 0.0, 0.0);      // TODO: this would be min/max distance
   let desiredPos = targetF.pos + desiredDir * desiredDist;
   let desiredAngle = angleOf(current.vel, current.angle); // angleOf(-targetDir);   // TODO: for ships use -targetDir  
-  let desired = ReferenceFrame(desiredPos, targetF.vel, desiredAngle, 0.0);
+  let desired = Body(desiredPos, targetF.vel, desiredAngle, 0.0);
 
-  let rel = referenceFrameSub(desired, current);
+  let rel = bodySub(desired, current);
   // Transform into the missile's coordinate system.
-  let localRel = referenceFrameRotate(rel, -current.angle);
+  let localRel = bodyRotate(rel, -current.angle);
 
   var localLinAcc = vec2f(0, 0);
   // Apply proportional navigation to track towards the target.
