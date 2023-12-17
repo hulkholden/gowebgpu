@@ -144,9 +144,6 @@ fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
     // clamp velocity for a more pleasing simulation
     (*body).vel = normalize((*body).vel) * clamp(length((*body).vel), 0.0, params.maxShipSpeed);
   }
-
-  // Write back
-  //gParticles.particles[index] = particle;
 }
 
 @compute @workgroup_size(64)
