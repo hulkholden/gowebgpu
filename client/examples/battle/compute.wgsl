@@ -121,29 +121,31 @@ fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
   bogusReferences();
 
   let index = GlobalInvocationID.x;
-  let body = &gBodies.bodies[index];
+  var body = gBodies.bodies[index];
   let particle = &gParticles.particles[index];
   let acc = gAccelerations.accelerations[index];
 
   // kinematic update
   (*particle).age += params.deltaT;
 
-  (*body).vel += acc.linearAcc * params.deltaT;
-  (*body).pos += (*body).vel * params.deltaT;
+  body.vel += acc.linearAcc * params.deltaT;
+  body.pos += body.vel * params.deltaT;
 
-  (*body).angularVel += acc.angularAcc * params.deltaT;
-  (*body).angle = normalizeAngle((*body).angle + (*body).angularVel * params.deltaT);
+  body.angularVel += acc.angularAcc * params.deltaT;
+  body.angle = normalizeAngle(body.angle + body.angularVel * params.deltaT);
 
   // Bounce off the boundary.
-  let under = ((*body).pos < params.minBound) & ((*body).vel < vec2());
-  let over = ((*body).pos > params.maxBound) & ((*body).vel > vec2());
-  (*body).vel = select((*body).vel, -(*body).vel * params.boundaryBounceFactor, under | over);
-  (*body).pos = clamp((*body).pos, params.minBound, params.maxBound);
+  let under = (body.pos < params.minBound) & (body.vel < vec2());
+  let over = (body.pos > params.maxBound) & (body.vel > vec2());
+  body.vel = select(body.vel, -body.vel * params.boundaryBounceFactor, under | over);
+  body.pos = clamp(body.pos, params.minBound, params.maxBound);
 
   if (particleType(index) == bodyTypeShip) {
     // clamp velocity for a more pleasing simulation
-    (*body).vel = normalize((*body).vel) * clamp(length((*body).vel), 0.0, params.maxShipSpeed);
+    body.vel = normalize(body.vel) * clamp(length(body.vel), 0.0, params.maxShipSpeed);
   }
+
+  gBodies.bodies[index] = body;
 }
 
 @compute @workgroup_size(64)
@@ -155,9 +157,9 @@ fn computeCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
     let particle = &gParticles.particles[index];
     let targetIdx = (*particle).targetIdx;
     if (targetIdx >= 0) {
-      let body = &gBodies.bodies[index];
-      let targetB = &gBodies.bodies[targetIdx];
-      let collide = distance((*body).pos, (*targetB).pos) < params.missileCollisionDist;
+      let body = gBodies.bodies[index];
+      let targetB = gBodies.bodies[targetIdx];
+      let collide = distance(body.pos, targetB.pos) < params.missileCollisionDist;
       if (collide) {
         let targetP = &gParticles.particles[targetIdx];
         atomicOr(&(*particle).flags, particleFlagHit);
@@ -172,7 +174,6 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
   bogusReferences();
 
   let index = GlobalInvocationID.x;
-  let body = &gBodies.bodies[index];
   let particle = &gParticles.particles[index];
 
   switch particleType(index) {
@@ -192,10 +193,13 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
       }
       // Reset on contact.
       if ((*particle).age > params.maxMissileAge || ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0)) {
-        (*body).pos = 2.0 * (rand22((*body).pos) - 0.5) * 1000.0;
-        (*body).vel = 2.0 * (rand22((*body).vel) - 0.5) * 0.0;
-        (*body).angle = 0.0;
-        (*body).angularVel = 0.0;
+        var body = gBodies.bodies[index];
+        body.pos = 2.0 * (rand22(body.pos) - 0.5) * 1000.0;
+        body.vel = 2.0 * (rand22(body.vel) - 0.5) * 0.0;
+        body.angle = 0.0;
+        body.angularVel = 0.0;
+        gBodies.bodies[index] = body;
+
         (*particle).age = 0.0;
         atomicStore(&(*particle).flags, 0);
         //gParticles.particles[index] = particle;
@@ -213,16 +217,16 @@ fn findTarget(selfIdx : u32) -> i32 {
 		return -1;
 	}
 
-  let body = &gBodies.bodies[selfIdx];
+  let body = gBodies.bodies[selfIdx];
 	let wantType = select(bodyTypeShip, bodyTypeMissile, selfTeam == 2);
 	var closestIdx = -1;
 	var closestDist = 0.0;
   for (var otherIdx = 0u; otherIdx < arrayLength(&gBodies.bodies); otherIdx++) {
-    let otherB = &gBodies.bodies[otherIdx];
+    let otherB = gBodies.bodies[otherIdx];
 		if (selfIdx == otherIdx || particleTeam(otherIdx) == selfTeam || particleType(otherIdx) != wantType) {
 			continue;
 		}
-    let dist = distance((*body).pos, (*otherB).pos);
+    let dist = distance(body.pos, otherB.pos);
 		if (closestIdx < 0 || dist < closestDist) {
 			closestDist = dist;
 			closestIdx = i32(otherIdx);
@@ -232,8 +236,8 @@ fn findTarget(selfIdx : u32) -> i32 {
 }
 
 fn bodyReferenceFrame(index : u32) -> ReferenceFrame {
-  let b = &gBodies.bodies[index];
-  return ReferenceFrame((*b).pos, (*b).vel, (*b).angle, (*b).angularVel);
+  let b = gBodies.bodies[index];
+  return ReferenceFrame(b.pos, b.vel, b.angle, b.angularVel);
 }
 
 fn particleType(index : u32) -> u32 {
@@ -259,9 +263,9 @@ fn flock(selfIdx : u32) -> Acceleration {
     if (otherIdx == selfIdx || particleType(otherIdx) != bodyTypeShip) {
       continue;
     }
-    let other = &gBodies.bodies[otherIdx];
-    let pos = (*other).pos.xy;
-    let vel = (*other).vel.xy;
+    let other = gBodies.bodies[otherIdx];
+    let pos = other.pos.xy;
+    let vel = other.vel.xy;
     let dPos = pos - current.pos;
     let dist = length(dPos);
     if (dist < params.avoidDistance) {
