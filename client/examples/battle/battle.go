@@ -75,13 +75,14 @@ type Body struct {
 type Particle struct {
 	col      uint32
 	metadata uint32
+	flags    uint32 `atomic:"true"`
+	debugVal float32
+}
 
-	// TODO: compress these down. Pack age in the metadata word?
+type Missile struct {
+	// TODO: compress these down. Use 16 bits for each?
 	targetIdx int32
 	age       float32
-	flags     uint32 `atomic:"true"`
-
-	debugVal float32
 }
 
 func (p Particle) BodyType() BodyType {
@@ -146,6 +147,7 @@ var (
 	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
 	bodyStruct              = wgsltypes.MustRegisterStruct[Body]()
 	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
+	missileStruct           = wgsltypes.MustRegisterStruct[Missile]()
 	accelerationStruct      = wgsltypes.MustRegisterStruct[Acceleration]()
 	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
 	contactStruct           = wgsltypes.MustRegisterStruct[Contact]()
@@ -197,13 +199,14 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
-	initialBodyData, initialParticleData := initParticleData(numParticles, simParams)
+	bodyData, particleData, missileData := initParticleData(numParticles, simParams)
 	particleBufferOpts := []engine.BufferOption{engine.WithVertexUsage()}
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
-	bodyBuffer := engine.InitStorageBufferSlice(device, initialBodyData, particleBufferOpts...)
-	particleBuffer := engine.InitStorageBufferSlice(device, initialParticleData, particleBufferOpts...)
+	bodyBuffer := engine.InitStorageBufferSlice(device, bodyData, particleBufferOpts...)
+	particleBuffer := engine.InitStorageBufferSlice(device, particleData, particleBufferOpts...)
+	missileBuffer := engine.InitStorageBufferSlice(device, missileData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
 	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
@@ -257,6 +260,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		simParamsStruct,
 		bodyStruct,
 		particleStruct,
+		missileStruct,
 		accelerationStruct,
 		contactStruct,
 		contactsContainerStruct,
@@ -299,6 +303,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: bodyBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: missileBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
 		),
@@ -384,7 +389,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initParticleData(n int, params SimParams) ([]Body, []Particle) {
+func initParticleData(n int, params SimParams) ([]Body, []Particle, []Missile) {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 
 	type particleChoice struct {
@@ -400,6 +405,7 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle) {
 
 	bs := make([]Body, n)
 	ps := make([]Particle, n)
+	ms := make([]Missile, n)
 	for i := 0; i < n; i++ {
 		bs[i].pos = randomLocation(r, params)
 		bs[i].vel = randomVelocity(r)
@@ -421,9 +427,9 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle) {
 
 		ps[i].metadata = makeMeta(choice.bodyType, choice.team)
 		ps[i].col = uint32(choice.team.Color())
-		ps[i].targetIdx = -1
+		ms[i].targetIdx = -1
 	}
-	return bs, ps
+	return bs, ps, ms
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {
