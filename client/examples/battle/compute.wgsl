@@ -119,11 +119,7 @@ fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
 
   let index = GlobalInvocationID.x;
   var body = gBodies.bodies[index];
-  let missile = &gMissiles.missiles[index];
   let acc = gAccelerations.accelerations[index];
-
-  // kinematic update
-  (*missile).age += params.deltaT;
 
   body.vel += acc.linearAcc * params.deltaT;
   body.pos += body.vel * params.deltaT;
@@ -191,6 +187,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
         }
       }
       // Reset on contact.
+      (*missile).age += params.deltaT;
       if ((*missile).age > params.maxMissileAge || ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0)) {
         var body = gBodies.bodies[index];
         body.pos = 2.0 * (rand22(body.pos) - 0.5) * 1000.0;
