@@ -180,11 +180,13 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     }
     case bodyTypeMissile: {
       let missile = &gMissiles.missiles[index];
-      if ((*missile).targetIdx < 0) {
-        (*missile).targetIdx = findTarget(index);
-        if ((*missile).targetIdx < 0) {
+      var targetIdx = (*missile).targetIdx;
+      if (targetIdx < 0) {
+        targetIdx = findTarget(index);
+        if (targetIdx < 0) {
           break;
         }
+        (*missile).targetIdx = targetIdx;
       }
       // Reset on contact.
       (*missile).age += params.deltaT;
