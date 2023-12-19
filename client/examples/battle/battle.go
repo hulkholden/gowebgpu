@@ -223,6 +223,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	vtxAttrs := []engine.VertexAttribute{
 		{BufferIndex: bodyBufferIdx, FieldName: "pos"},
 		{BufferIndex: bodyBufferIdx, FieldName: "angle"},
+		{BufferIndex: particleBufferIdx, FieldName: "metadata"},
 		{BufferIndex: particleBufferIdx, FieldName: "col"},
 		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}

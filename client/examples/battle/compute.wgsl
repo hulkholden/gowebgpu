@@ -164,6 +164,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     }
     case bodyTypeShip: {
       if (hit) {
+        resetParticle(index);
         (*particle).col = 0xffff00ffu;
       }
     }
@@ -172,9 +173,13 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
       gMissiles[index].age += params.deltaT;
 
       if (gMissiles[index].age > params.maxMissileAge || hit) {
+        let metadata = gParticles[index].metadata;
         resetBody(index);
         resetMissile(index);
         resetParticle(index);
+        // Preserve the type/team.
+        // TODO: have some other process for recycling particles.
+        gParticles[index].metadata = metadata;
       }
     }
     default: {
@@ -208,11 +213,14 @@ fn resetBody(index : u32) {
 }
 
 fn resetMissile(index : u32) {
-  gMissiles[index] = Missile();
+  var m = Missile();
+  m.targetIdx = -1;
+  gMissiles[index] = m;
 }
 
 fn resetParticle(index : u32) {
   let particle = &gParticles[index];
+  (*particle).metadata = 0;
   atomicStore(&(*particle).flags, 0);
 }
 
