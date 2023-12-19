@@ -157,36 +157,40 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
 
   let index = GlobalInvocationID.x;
   let particle = &gParticles[index];
+  let hit = (atomicLoad(&(*particle).flags) & particleFlagHit) != 0;
 
   switch particleType(index) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      if ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0) {
+      if (hit) {
         (*particle).col = 0xffff00ffu;
       }
     }
     case bodyTypeMissile: {
-      let missile = &gMissiles[index];
-      var targetIdx = (*missile).targetIdx;
-      if (targetIdx < 0) {
-        targetIdx = findTarget(index);
-        if (targetIdx < 0) {
-          break;
-        }
-        (*missile).targetIdx = targetIdx;
-      }
-      // Reset on contact.
-      (*missile).age += params.deltaT;
-      if ((*missile).age > params.maxMissileAge || ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0)) {
-        gBodies[index] = randomizeBody(gBodies[index]);
-        (*missile).age = 0.0;
-        atomicStore(&(*particle).flags, 0);
-        //gParticles[index] = particle;
+      updateMissileTarget(index);
+      gMissiles[index].age += params.deltaT;
+
+      if (gMissiles[index].age > params.maxMissileAge || hit) {
+        resetBody(index);
+        resetMissile(index);
+        resetParticle(index);
       }
     }
     default: {
     }
+  }
+}
+
+fn updateMissileTarget(selfIdx : u32) {
+  let missile = gMissiles[selfIdx];
+  let targetIdx = missile.targetIdx;
+  if (targetIdx >= 0) {
+    return;
+  }
+  let newTargetIdx = findTarget(selfIdx);
+  if (newTargetIdx >= 0) {
+    gMissiles[selfIdx].targetIdx = newTargetIdx;
   }
 }
 
@@ -197,6 +201,19 @@ fn randomizeBody(b : Body) -> Body {
   newBody.angle = 0.0;
   newBody.angularVel = 0.0;
   return newBody;
+}
+
+fn resetBody(index : u32) {
+  gBodies[index] = randomizeBody(gBodies[index]);
+}
+
+fn resetMissile(index : u32) {
+  gMissiles[index] = Missile();
+}
+
+fn resetParticle(index : u32) {
+  let particle = &gParticles[index];
+  atomicStore(&(*particle).flags, 0);
 }
 
 fn findTarget(selfIdx : u32) -> i32 {
