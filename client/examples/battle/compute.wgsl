@@ -179,13 +179,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
       // Reset on contact.
       (*missile).age += params.deltaT;
       if ((*missile).age > params.maxMissileAge || ((atomicLoad(&(*particle).flags) & particleFlagHit) != 0)) {
-        var body = gBodies[index];
-        body.pos = 2.0 * (rand22(body.pos) - 0.5) * 1000.0;
-        body.vel = 2.0 * (rand22(body.vel) - 0.5) * 0.0;
-        body.angle = 0.0;
-        body.angularVel = 0.0;
-        gBodies[index] = body;
-
+        gBodies[index] = randomizeBody(gBodies[index]);
         (*missile).age = 0.0;
         atomicStore(&(*particle).flags, 0);
         //gParticles[index] = particle;
@@ -194,6 +188,15 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     default: {
     }
   }
+}
+
+fn randomizeBody(b : Body) -> Body {
+  var newBody = Body();
+  newBody.pos = 2.0 * (rand22(b.pos) - 0.5) * 1000.0;
+  newBody.vel = 2.0 * (rand22(b.vel) - 0.5) * 0.0;
+  newBody.angle = 0.0;
+  newBody.angularVel = 0.0;
+  return newBody;
 }
 
 fn findTarget(selfIdx : u32) -> i32 {
