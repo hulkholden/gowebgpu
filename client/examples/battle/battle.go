@@ -73,9 +73,9 @@ type Body struct {
 }
 
 type Particle struct {
-	col      uint32
 	metadata uint32
 	flags    uint32 `atomic:"true"`
+	col      uint32
 	debugVal float32
 }
 
