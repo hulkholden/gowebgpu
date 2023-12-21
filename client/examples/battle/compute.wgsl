@@ -192,10 +192,36 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
   }
 }
 
-fn addFreeID(freeIdx : u32) {
-  let freeIDIdx = atomicAdd(&gFreeIDs.count, 1);
-  if (freeIDIdx < arrayLength(&gFreeIDs.elements)) {
-    gFreeIDs.elements[freeIDIdx] = freeIdx;
+fn addFreeID(freeIdx : u32) -> bool {
+  let capacity = arrayLength(&gFreeIDs.elements);
+
+  // Loop until we push or the buffer is full.
+  while (true) {
+    let oldValue = atomicLoad(&gFreeIDs.count);
+    if (oldValue >= capacity) {
+      return false;
+    }
+    let newValue = oldValue + 1;
+    let result = atomicCompareExchangeWeak(&gFreeIDs.count, oldValue, newValue);
+    if (result.exchanged) {
+      gFreeIDs.elements[oldValue] = freeIdx;
+      return true;
+    }
+  }
+}
+
+fn getFreeID() -> i32 {
+  // Loop until we pop or the buffer is empty.
+  while (true) {
+    let oldValue = atomicLoad(&gFreeIDs.count);
+    if (oldValue <= 0) {
+      return -1;
+    }
+    let newValue = oldValue - 1;
+    let result = atomicCompareExchangeWeak(&gFreeIDs.count, oldValue, newValue);
+    if (result.exchanged) {
+      return i32(gFreeIDs.elements[newValue]);
+    }
   }
 }
 
