@@ -157,8 +157,8 @@ fn applyCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>
   for (var contactIdx = 0u; contactIdx < contactCount; contactIdx++) {
     let aIdx = gContacts.elements[contactIdx].aIdx;
     let bIdx = gContacts.elements[contactIdx].bIdx;
-    gParticles[aIdx].flags |= particleFlagHit;
-    gParticles[bIdx].flags |= particleFlagHit;
+    setParticleHit(aIdx);
+    setParticleHit(bIdx);
   }
 }
 
@@ -257,6 +257,10 @@ fn findTarget(selfIdx : u32) -> i32 {
 		}
 	}
 	return closestIdx;
+}
+
+fn setParticleHit(index : u32) {
+  gParticles[index].flags |= particleFlagHit;
 }
 
 fn particleHit(index : u32) -> bool {
