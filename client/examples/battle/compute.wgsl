@@ -167,8 +167,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
   bogusReferences();
 
   let index = GlobalInvocationID.x;
-  let particle = &gParticles[index];
-  let hit = ((*particle).flags & particleFlagHit) != 0;
+  let hit = particleHit(index);
 
   switch particleType(index) {
     case bodyTypeNone: {
@@ -176,7 +175,6 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     case bodyTypeShip: {
       if (hit) {
         resetParticle(index);
-        (*particle).col = 0xffff00ffu;
       }
     }
     case bodyTypeMissile: {
@@ -185,12 +183,14 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
 
       if (gMissiles[index].age > params.maxMissileAge || hit) {
         let metadata = gParticles[index].metadata;
+        let col = gParticles[index].col;
         resetBody(index);
         resetMissile(index);
         resetParticle(index);
         // Preserve the type/team.
         // TODO: have some other process for recycling particles.
         gParticles[index].metadata = metadata;
+        gParticles[index].col = col;
       }
     }
     default: {
@@ -230,9 +230,8 @@ fn resetMissile(index : u32) {
 }
 
 fn resetParticle(index : u32) {
-  let particle = &gParticles[index];
-  (*particle).metadata = 0;
-  (*particle).flags = 0;
+  let p = Particle();
+  gParticles[index] = p;
 }
 
 fn findTarget(selfIdx : u32) -> i32 {
@@ -260,14 +259,19 @@ fn findTarget(selfIdx : u32) -> i32 {
 	return closestIdx;
 }
 
+fn particleHit(index : u32) -> bool {
+  let flags = gParticles[index].flags;
+  return (flags & particleFlagHit) != 0;
+}
+
 fn particleType(index : u32) -> u32 {
-  let p = &gParticles[index];
-  return ((*p).metadata >> 8) & 0xff;
+  let metadata = gParticles[index].metadata;
+  return (metadata >> 8) & 0xff;
 }
 
 fn particleTeam(index : u32) -> u32 {
-  let p = &gParticles[index];
-  return (*p).metadata & 0xff;
+  let metadata = gParticles[index].metadata;
+  return metadata & 0xff;
 }
 
 fn flock(selfIdx : u32) -> Acceleration {
