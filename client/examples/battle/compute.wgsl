@@ -19,13 +19,6 @@ const bodyTypeMissile = 2u;
 
 const particleFlagHit = 1u;
 
-fn addContact(aIdx : u32, bIdx : u32) {
-  let contactIdx = atomicAdd(&gContacts.count, 1);
-  if (contactIdx < arrayLength(&gContacts.elements)) {
-    gContacts.elements[contactIdx] = Contact(aIdx, bIdx);
-  }
-}
-
 fn bodySub(a : Body, b : Body) -> Body {
   return Body(a.pos - b.pos, a.vel - b.vel, angleDiff(a.angle, b.angle), a.angularVel - b.angularVel);
 }
@@ -142,12 +135,30 @@ fn computeCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
       let targetB = gBodies[targetIdx];
       let collide = distance(body.pos, targetB.pos) < params.missileCollisionDist;
       if (collide) {
-        let particle = &gParticles[index];
-        let targetP = &gParticles[targetIdx];
-        atomicOr(&(*particle).flags, particleFlagHit);
-        atomicOr(&(*targetP).flags, particleFlagHit);
+        addContact(index, u32(targetIdx));
       }
     }
+  }
+}
+
+fn addContact(aIdx : u32, bIdx : u32) {
+  let contactIdx = atomicAdd(&gContacts.count, 1);
+  if (contactIdx < arrayLength(&gContacts.elements)) {
+    gContacts.elements[contactIdx] = Contact(aIdx, bIdx);
+  }
+}
+
+// This is not parallelised but the number of contacts should be low each frame.
+@compute @workgroup_size(1)
+fn applyCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  bogusReferences();
+
+  let contactCount = min(atomicLoad(&gContacts.count), u32(arrayLength(&gContacts.elements)));
+  for (var contactIdx = 0u; contactIdx < contactCount; contactIdx++) {
+    let aIdx = gContacts.elements[contactIdx].aIdx;
+    let bIdx = gContacts.elements[contactIdx].bIdx;
+    gParticles[aIdx].flags |= particleFlagHit;
+    gParticles[bIdx].flags |= particleFlagHit;
   }
 }
 
@@ -157,7 +168,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
 
   let index = GlobalInvocationID.x;
   let particle = &gParticles[index];
-  let hit = (atomicLoad(&(*particle).flags) & particleFlagHit) != 0;
+  let hit = ((*particle).flags & particleFlagHit) != 0;
 
   switch particleType(index) {
     case bodyTypeNone: {
@@ -221,7 +232,7 @@ fn resetMissile(index : u32) {
 fn resetParticle(index : u32) {
   let particle = &gParticles[index];
   (*particle).metadata = 0;
-  atomicStore(&(*particle).flags, 0);
+  (*particle).flags = 0;
 }
 
 fn findTarget(selfIdx : u32) -> i32 {
