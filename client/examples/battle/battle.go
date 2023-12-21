@@ -19,6 +19,7 @@ const (
 	numParticles = 500
 
 	maxContactCount = 1024
+	maxFreeIDsCount = numParticles
 
 	initialVelScale = 100.0
 
@@ -110,6 +111,12 @@ type ContactsContainer struct {
 	elements [maxContactCount]Contact `runtimeArray:"true"`
 }
 
+type FreeIDsContainer struct {
+	count    uint32 `atomic:"true"`
+	pad      uint32
+	elements [maxFreeIDsCount]uint32 `runtimeArray:"true"`
+}
+
 type Team uint8
 
 var teamColMap = map[Team]ARGB{
@@ -152,6 +159,7 @@ var (
 	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
 	contactStruct           = wgsltypes.MustRegisterStruct[Contact]()
 	contactsContainerStruct = wgsltypes.MustRegisterStruct[ContactsContainer]()
+	freeIDsContainerStruct  = wgsltypes.MustRegisterStruct[FreeIDsContainer]()
 )
 
 //go:embed compute.wgsl
@@ -209,6 +217,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	missileBuffer := engine.InitStorageBufferSlice(device, missileData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
 	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
+	freeIDsBuffer := engine.InitStorageBufferStruct(device, FreeIDsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const bodyBufferIdx = 0
@@ -265,6 +274,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		accelerationStruct,
 		contactStruct,
 		contactsContainerStruct,
+		freeIDsContainerStruct,
 	}
 
 	// Compute
@@ -314,6 +324,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			wasmgpu.GPUBufferBinding{Buffer: missileBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
 		),
 	})
 

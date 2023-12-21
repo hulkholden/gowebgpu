@@ -7,6 +7,7 @@
 @binding(3) @group(0) var<storage, read_write> gMissiles : array<Missile>;
 @binding(4) @group(0) var<storage, read_write> gAccelerations : array<Acceleration>;
 @binding(5) @group(0) var<storage, read_write> gContacts : ContactsContainer;
+@binding(6) @group(0) var<storage, read_write> gFreeIDs : FreeIDsContainer;
 
 const pi = 3.14159265359;
 const twoPi = 2 * pi;
@@ -68,6 +69,7 @@ fn bogusReferences() {
   let dummy3 = &gMissiles;
   let dummy4 = &gAccelerations;
   let dummy5 = &gContacts;
+  let dummy6 = &gFreeIDs;
 }
 
 @compute @workgroup_size(64)
@@ -167,34 +169,33 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
   bogusReferences();
 
   let index = GlobalInvocationID.x;
-  let hit = particleHit(index);
+  if (particleHit(index)) {
+    killParticle(index);
+    return;
+  }
 
   switch particleType(index) {
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      if (hit) {
-        resetParticle(index);
-      }
     }
     case bodyTypeMissile: {
       updateMissileTarget(index);
       gMissiles[index].age += params.deltaT;
-
-      if (gMissiles[index].age > params.maxMissileAge || hit) {
-        let metadata = gParticles[index].metadata;
-        let col = gParticles[index].col;
-        resetBody(index);
-        resetMissile(index);
-        resetParticle(index);
-        // Preserve the type/team.
-        // TODO: have some other process for recycling particles.
-        gParticles[index].metadata = metadata;
-        gParticles[index].col = col;
+      if (gMissiles[index].age > params.maxMissileAge) {
+        killParticle(index);
+        return;
       }
     }
     default: {
     }
+  }
+}
+
+fn addFreeID(freeIdx : u32) {
+  let freeIDIdx = atomicAdd(&gFreeIDs.count, 1);
+  if (freeIDIdx < arrayLength(&gFreeIDs.elements)) {
+    gFreeIDs.elements[freeIDIdx] = freeIdx;
   }
 }
 
@@ -217,6 +218,13 @@ fn randomizeBody(b : Body) -> Body {
   newBody.angle = 0.0;
   newBody.angularVel = 0.0;
   return newBody;
+}
+
+fn killParticle(index : u32) {
+  resetBody(index);
+  resetMissile(index);
+  resetParticle(index);
+  addFreeID(index);
 }
 
 fn resetBody(index : u32) {
@@ -316,7 +324,7 @@ fn flock(selfIdx : u32) -> Acceleration {
   if (cVelCount > 0) {
     cVel /= f32(cVelCount);
   }
-  
+
   var acc = Acceleration();
   let dVel = (colVel * params.avoidScale) + (cMass * params.cMassScale) + (cVel * params.cVelScale);
   acc.linearAcc = dVel / params.deltaT;
@@ -340,7 +348,7 @@ fn updateMissile(selfIdx : u32, targetIdx : u32) -> Acceleration {
   let desiredDir = targetDir;
   let desiredDist = clamp(targetDist, 0.0, 0.0);      // TODO: this would be min/max distance
   let desiredPos = targetBody.pos + desiredDir * desiredDist;
-  let desiredAngle = angleOf(currentBody.vel, currentBody.angle); // angleOf(-targetDir);   // TODO: for ships use -targetDir  
+  let desiredAngle = angleOf(currentBody.vel, currentBody.angle); // angleOf(-targetDir);   // TODO: for ships use -targetDir
   let desiredBody = Body(desiredPos, targetBody.vel, desiredAngle, 0.0);
 
   let rel = bodySub(desiredBody, currentBody);
