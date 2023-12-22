@@ -199,7 +199,7 @@ fn addFreeID(freeIdx : u32) -> bool {
   while (true) {
     let oldValue = atomicLoad(&gFreeIDs.count);
     if (oldValue >= capacity) {
-      return false;
+      break;
     }
     let newValue = oldValue + 1;
     let result = atomicCompareExchangeWeak(&gFreeIDs.count, oldValue, newValue);
@@ -208,6 +208,7 @@ fn addFreeID(freeIdx : u32) -> bool {
       return true;
     }
   }
+  return false;
 }
 
 fn getFreeID() -> i32 {
@@ -215,7 +216,7 @@ fn getFreeID() -> i32 {
   while (true) {
     let oldValue = atomicLoad(&gFreeIDs.count);
     if (oldValue <= 0) {
-      return -1;
+      break;
     }
     let newValue = oldValue - 1;
     let result = atomicCompareExchangeWeak(&gFreeIDs.count, oldValue, newValue);
@@ -223,6 +224,7 @@ fn getFreeID() -> i32 {
       return i32(gFreeIDs.elements[newValue]);
     }
   }
+  return -1;
 }
 
 fn updateMissileTarget(selfIdx : u32) {
