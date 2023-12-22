@@ -192,6 +192,39 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
   }
 }
 
+@compute @workgroup_size(64)
+fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  bogusReferences();
+
+  let index = GlobalInvocationID.x;
+
+  switch particleType(index) {
+    case bodyTypeNone: {
+    }
+    case bodyTypeShip: {
+      let mIdxSigned = getFreeID();
+      if (mIdxSigned >= 0) {
+        // TODO: Would be nicer for ships to check for a target first, then only fire a missile
+        // if there's a target in range.
+
+        let mIdx = u32(mIdxSigned);
+        // TODO: need to somehow synchronise writes so we're not changing particle types
+        // as we're iterating over them.
+        gBodies[mIdx] = gBodies[index];
+        gParticles[mIdx].metadata = makeParticleMetadata(bodyTypeMissile, particleTeam(index));
+        gParticles[mIdx].flags = 0;
+        gParticles[mIdx].col = 0xffff00ff;
+        gMissiles[mIdx].age = 0.0;
+        gMissiles[mIdx].targetIdx = -1;
+      }
+    }
+    case bodyTypeMissile: {
+    }
+    default: {
+    }
+  }
+}
+
 fn addFreeID(freeIdx : u32) -> bool {
   let capacity = arrayLength(&gFreeIDs.elements);
 
@@ -278,7 +311,8 @@ fn findTarget(selfIdx : u32) -> i32 {
 	}
 
   let body = gBodies[selfIdx];
-	let wantType = select(bodyTypeShip, bodyTypeMissile, selfTeam == 2);
+  // TODO: figure out how to represent "anti missile missile".
+	let wantType = select(bodyTypeShip, bodyTypeMissile, false);
 	var closestIdx = -1;
 	var closestDist = 0.0;
   for (var otherIdx = 0u; otherIdx < arrayLength(&gBodies); otherIdx++) {
@@ -302,6 +336,10 @@ fn setParticleHit(index : u32) {
 fn particleHit(index : u32) -> bool {
   let flags = gParticles[index].flags;
   return (flags & particleFlagHit) != 0;
+}
+
+fn makeParticleMetadata(bodyType : u32, team : u32) -> u32 {
+  return (bodyType << 8) | team;
 }
 
 fn particleType(index : u32) -> u32 {

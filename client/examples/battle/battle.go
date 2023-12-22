@@ -314,6 +314,13 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			EntryPoint: "updateMissileLifecycle",
 		},
 	})
+	spawnMissilesPipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
+		// Layout: "auto",
+		Compute: wasmgpu.GPUProgrammableStage{
+			Module:     computeShaderModule,
+			EntryPoint: "spawnMissiles",
+		},
+	})
 
 	computeBindGroup := device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 		Layout: computeAccelerationPipeline.GetBindGroupLayout(0),
@@ -391,6 +398,13 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			passEncoder.End()
 		}
 		{
+			passEncoder := commandEncoder.BeginComputePass(opt.V(computePassDescriptor))
+			passEncoder.SetPipeline(spawnMissilesPipeline)
+			passEncoder.SetBindGroup(0, computeBindGroup, nil)
+			passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(particleWorkgroups), 0, 0)
+			passEncoder.End()
+		}
+		{
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
 			passEncoder.SetPipeline(renderPipeline)
 			vertexBuffers.Bind(passEncoder)
@@ -426,8 +440,11 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Missile) {
 
 	chooser, _ := weightedrand.NewChooser(
 		weightedrand.NewChoice(particleChoice{BodyTypeShip, 0}, 100),
+		weightedrand.NewChoice(particleChoice{BodyTypeShip, 1}, 100),
+		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 0}, 5),
 		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 1}, 5),
-		weightedrand.NewChoice(particleChoice{BodyTypeMissile, 2}, 1), // AntiMissile
+		// TODO: figure out a better way to represent anti-missile missiles.
+		// weightedrand.NewChoice(particleChoice{BodyTypeMissile, 0}, 1),
 	)
 
 	bs := make([]Body, n)
