@@ -110,13 +110,13 @@ fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
   body.angularVel += acc.angularAcc * params.deltaT;
   body.angle = normalizeAngle(body.angle + body.angularVel * params.deltaT);
 
-  // Bounce off the boundary.
-  let under = (body.pos < params.minBound) & (body.vel < vec2());
-  let over = (body.pos > params.maxBound) & (body.vel > vec2());
-  body.vel = select(body.vel, -body.vel * params.boundaryBounceFactor, under | over);
-  body.pos = clamp(body.pos, params.minBound, params.maxBound);
-
   if (particleType(index) == bodyTypeShip) {
+    // Bounce off the boundary.
+    let under = (body.pos < params.minBound) & (body.vel < vec2());
+    let over = (body.pos > params.maxBound) & (body.vel > vec2());
+    body.vel = select(body.vel, -body.vel * params.boundaryBounceFactor, under | over);
+    body.pos = clamp(body.pos, params.minBound, params.maxBound);
+
     // clamp velocity for a more pleasing simulation
     body.vel = normalize(body.vel) * clamp(length(body.vel), 0.0, params.maxShipSpeed);
   }
