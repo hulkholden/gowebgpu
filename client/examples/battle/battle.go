@@ -23,6 +23,8 @@ const (
 
 	initialVelScale = 100.0
 
+	shipFireCooldown = 3.0
+
 	enableDebugBuffer = false
 )
 
@@ -54,14 +56,15 @@ type SimParams struct {
 	// boundaryBounceFactor is the velocity preserved after colliding with the boundary.
 	boundaryBounceFactor float32
 
-	maxShipSpeed float32
+	maxShipSpeed     float32
+	shipFireCooldown float32
 
 	maxMissileSpeed  float32
 	maxMissileAcc    float32
 	maxMissileAngAcc float32
 
 	// TODO: need to ensure struct is multiple of alignment size (8 for V2).
-	// pad uint32
+	pad uint32
 }
 
 const kParticleFlagHit = 1
@@ -78,6 +81,12 @@ type Particle struct {
 	flags    uint32
 	col      uint32
 	debugVal float32
+}
+
+type Ship struct {
+	// TODO: store time of next shot rather than tracking the cooldown (which needs updating each frame).
+	cooldown float32
+	pad      uint32
 }
 
 type Missile struct {
@@ -154,6 +163,7 @@ var (
 	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
 	bodyStruct              = wgsltypes.MustRegisterStruct[Body]()
 	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
+	shipStruct              = wgsltypes.MustRegisterStruct[Ship]()
 	missileStruct           = wgsltypes.MustRegisterStruct[Missile]()
 	accelerationStruct      = wgsltypes.MustRegisterStruct[Acceleration]()
 	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
@@ -188,7 +198,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		maxMissileAge:        10.0,
 		missileCollisionDist: 10.0,
 
-		maxShipSpeed: 100.0,
+		maxShipSpeed:     100.0,
+		shipFireCooldown: shipFireCooldown,
 
 		maxMissileSpeed:  150.0,
 		maxMissileAcc:    150.0,
@@ -207,14 +218,15 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
-	bodyData, particleData, missileData := initParticleData(numParticles, simParams)
+	bodyData, particleData, shipData, missileData := initParticleData(numParticles, simParams)
 	particleBufferOpts := []engine.BufferOption{engine.WithVertexUsage()}
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
 	}
 	bodyBuffer := engine.InitStorageBufferSlice(device, bodyData, particleBufferOpts...)
 	particleBuffer := engine.InitStorageBufferSlice(device, particleData, particleBufferOpts...)
-	missileBuffer := engine.InitStorageBufferSlice(device, missileData, particleBufferOpts...)
+	shipsBuffer := engine.InitStorageBufferSlice(device, shipData, particleBufferOpts...)
+	missilesBuffer := engine.InitStorageBufferSlice(device, missileData, particleBufferOpts...)
 	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
 	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 	freeIDsBuffer := engine.InitStorageBufferStruct(device, FreeIDsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
@@ -270,6 +282,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		simParamsStruct,
 		bodyStruct,
 		particleStruct,
+		shipStruct,
 		missileStruct,
 		accelerationStruct,
 		contactStruct,
@@ -328,7 +341,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: bodyBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
-			wasmgpu.GPUBufferBinding{Buffer: missileBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: shipsBuffer.Buffer()},
+			wasmgpu.GPUBufferBinding{Buffer: missilesBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
 			wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
@@ -430,7 +444,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initParticleData(n int, params SimParams) ([]Body, []Particle, []Missile) {
+func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Missile) {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 
 	type particleChoice struct {
@@ -449,6 +463,7 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Missile) {
 
 	bs := make([]Body, n)
 	ps := make([]Particle, n)
+	ss := make([]Ship, n)
 	ms := make([]Missile, n)
 	for i := 0; i < n; i++ {
 		bs[i].pos = randomLocation(r, params)
@@ -471,9 +486,10 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Missile) {
 
 		ps[i].metadata = makeMeta(choice.bodyType, choice.team)
 		ps[i].col = uint32(choice.team.Color())
+		ss[i].cooldown = rand.Float32() * shipFireCooldown
 		ms[i].targetIdx = -1
 	}
-	return bs, ps, ms
+	return bs, ps, ss, ms
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {

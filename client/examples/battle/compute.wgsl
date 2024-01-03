@@ -4,10 +4,11 @@
 // used in the different entry points?
 @binding(1) @group(0) var<storage, read_write> gBodies : array<Body>;
 @binding(2) @group(0) var<storage, read_write> gParticles : array<Particle>;
-@binding(3) @group(0) var<storage, read_write> gMissiles : array<Missile>;
-@binding(4) @group(0) var<storage, read_write> gAccelerations : array<Acceleration>;
-@binding(5) @group(0) var<storage, read_write> gContacts : ContactsContainer;
-@binding(6) @group(0) var<storage, read_write> gFreeIDs : FreeIDsContainer;
+@binding(3) @group(0) var<storage, read_write> gShips : array<Ship>;
+@binding(4) @group(0) var<storage, read_write> gMissiles : array<Missile>;
+@binding(5) @group(0) var<storage, read_write> gAccelerations : array<Acceleration>;
+@binding(6) @group(0) var<storage, read_write> gContacts : ContactsContainer;
+@binding(7) @group(0) var<storage, read_write> gFreeIDs : FreeIDsContainer;
 
 fn bogusReferences() {
   // Chrome seems to silently discard unreferenced resources then complain when
@@ -16,9 +17,10 @@ fn bogusReferences() {
   let dummy1 = &gBodies;
   let dummy2 = &gParticles;
   let dummy3 = &gMissiles;
-  let dummy4 = &gAccelerations;
-  let dummy5 = &gContacts;
-  let dummy6 = &gFreeIDs;
+  let dummy4 = &gShips;
+  let dummy5 = &gAccelerations;
+  let dummy6 = &gContacts;
+  let dummy7 = &gFreeIDs;
 }
 
 const pi = 3.14159265359;
@@ -178,6 +180,7 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
+      gShips[index].cooldown -= params.deltaT;
     }
     case bodyTypeMissile: {
       updateMissileTarget(index);
@@ -202,20 +205,24 @@ fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) 
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      let mIdxSigned = getFreeID();
-      if (mIdxSigned >= 0) {
+      let ship = gShips[index];
+      if (ship.cooldown < 0) {
         // TODO: Would be nicer for ships to check for a target first, then only fire a missile
         // if there's a target in range.
+        let mIdxSigned = getFreeID();
+        if (mIdxSigned >= 0) {
+          gShips[index].cooldown = params.shipFireCooldown;
 
-        let mIdx = u32(mIdxSigned);
-        // TODO: need to somehow synchronise writes so we're not changing particle types
-        // as we're iterating over them.
-        gBodies[mIdx] = gBodies[index];
-        gParticles[mIdx].metadata = makeParticleMetadata(bodyTypeMissile, particleTeam(index));
-        gParticles[mIdx].flags = 0;
-        gParticles[mIdx].col = 0xffff00ff;
-        gMissiles[mIdx].age = 0.0;
-        gMissiles[mIdx].targetIdx = -1;
+          let mIdx = u32(mIdxSigned);
+          // TODO: need to somehow synchronise writes so we're not changing particle types
+          // as we're iterating over them.
+          gBodies[mIdx] = gBodies[index];
+          gParticles[mIdx].metadata = makeParticleMetadata(bodyTypeMissile, particleTeam(index));
+          gParticles[mIdx].flags = 0;
+          gParticles[mIdx].col = 0xffff00ff;
+          gMissiles[mIdx].age = 0.0;
+          gMissiles[mIdx].targetIdx = -1;
+        }
       }
     }
     case bodyTypeMissile: {
