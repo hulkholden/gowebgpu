@@ -9,6 +9,18 @@
 @binding(5) @group(0) var<storage, read_write> gContacts : ContactsContainer;
 @binding(6) @group(0) var<storage, read_write> gFreeIDs : FreeIDsContainer;
 
+fn bogusReferences() {
+  // Chrome seems to silently discard unreferenced resources then complain when
+  // they're provided in the bind group.
+  let dummy0 = &params;
+  let dummy1 = &gBodies;
+  let dummy2 = &gParticles;
+  let dummy3 = &gMissiles;
+  let dummy4 = &gAccelerations;
+  let dummy5 = &gContacts;
+  let dummy6 = &gFreeIDs;
+}
+
 const pi = 3.14159265359;
 const twoPi = 2 * pi;
 
@@ -58,18 +70,6 @@ fn normalizeAngle(a : f32) -> f32 {
 // TOOD: check whathappens if x is < 0.
 fn modReplacement(x : f32, y : f32) -> f32 {
   return x - (y * floor(x/y));
-}
-
-fn bogusReferences() {
-  // Chrome seems to silently discard unreferenced resources then complain when
-  // they're provided in the bind group.
-  let dummy0 = &params;
-  let dummy1 = &gBodies;
-  let dummy2 = &gParticles;
-  let dummy3 = &gMissiles;
-  let dummy4 = &gAccelerations;
-  let dummy5 = &gContacts;
-  let dummy6 = &gFreeIDs;
 }
 
 @compute @workgroup_size(64)
