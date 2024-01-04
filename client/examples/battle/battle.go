@@ -23,7 +23,7 @@ const (
 
 	initialVelScale = 100.0
 
-	shipFireCooldown = 3.0
+	shipShotCooldown = 3.0
 
 	enableDebugBuffer = false
 )
@@ -59,7 +59,7 @@ type SimParams struct {
 	boundaryBounceFactor float32
 
 	maxShipSpeed     float32
-	shipFireCooldown float32
+	shipShotCooldown float32
 
 	maxMissileSpeed  float32
 	maxMissileAcc    float32
@@ -86,9 +86,8 @@ type Particle struct {
 }
 
 type Ship struct {
-	// TODO: store time of next shot rather than tracking the cooldown (which needs updating each frame).
-	cooldown float32
-	pad      uint32
+	nextShotTime float32
+	pad          uint32
 }
 
 type Missile struct {
@@ -201,7 +200,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		missileCollisionDist: 10.0,
 
 		maxShipSpeed:     100.0,
-		shipFireCooldown: shipFireCooldown,
+		shipShotCooldown: shipShotCooldown,
 
 		maxMissileSpeed:  150.0,
 		maxMissileAcc:    150.0,
@@ -491,7 +490,6 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Mi
 
 		ps[i].metadata = makeMeta(choice.bodyType, choice.team)
 		ps[i].col = uint32(choice.team.Color())
-		ss[i].cooldown = rand.Float32() * shipFireCooldown
 		ms[i].targetIdx = -1
 	}
 	return bs, ps, ss, ms

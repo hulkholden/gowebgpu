@@ -180,7 +180,6 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     case bodyTypeNone: {
     }
     case bodyTypeShip: {
-      gShips[index].cooldown -= params.deltaT;
     }
     case bodyTypeMissile: {
       updateMissileTarget(index);
@@ -206,12 +205,12 @@ fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) 
     }
     case bodyTypeShip: {
       let ship = gShips[index];
-      if (ship.cooldown < 0) {
+      if (params.time >= ship.nextShotTime) {
         // TODO: Would be nicer for ships to check for a target first, then only fire a missile
         // if there's a target in range.
         let mIdxSigned = getFreeID();
         if (mIdxSigned >= 0) {
-          gShips[index].cooldown = params.shipFireCooldown;
+          gShips[index].nextShotTime = params.time + params.shipShotCooldown;
 
           let mIdx = u32(mIdxSigned);
           // TODO: need to somehow synchronise writes so we're not changing particle types
@@ -290,8 +289,9 @@ fn randomizeBody(b : Body) -> Body {
 
 fn killParticle(index : u32) {
   resetBody(index);
-  resetMissile(index);
   resetParticle(index);
+  resetShip(index);
+  resetMissile(index);
   addFreeID(index);
 }
 
@@ -303,6 +303,11 @@ fn resetMissile(index : u32) {
   var m = Missile();
   m.targetIdx = -1;
   gMissiles[index] = m;
+}
+
+fn resetShip(index : u32) {
+  var s = Ship();
+  gShips[index] = s;
 }
 
 fn resetParticle(index : u32) {
