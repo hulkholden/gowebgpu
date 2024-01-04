@@ -25,8 +25,8 @@ func (b GPUBuffer[T]) BufferSize() wasmgpu.GPUSize64 {
 	return wasmgpu.GPUSize64(b.size)
 }
 
-// TODO: make UniformBuffer generic so we can use `value T` here?
-func (b GPUBuffer[T]) UpdateBuffer(bytes []byte) {
+func (b GPUBuffer[T]) UpdateBufferStruct(value T) {
+	bytes := structAsByteSlice(value)
 	b.device.Queue().WriteBuffer(b.buffer, 0, bytes)
 }
 

@@ -42,7 +42,9 @@ type SimParams struct {
 	minBound vmath.V2
 	maxBound vmath.V2
 
-	deltaT        float32
+	time   float32
+	deltaT float32
+
 	avoidDistance float32
 	cMassDistance float32
 	cVelDistance  float32
@@ -64,7 +66,7 @@ type SimParams struct {
 	maxMissileAngAcc float32
 
 	// TODO: need to ensure struct is multiple of alignment size (8 for V2).
-	pad uint32
+	// pad uint32
 }
 
 const kParticleFlagHit = 1
@@ -371,6 +373,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	update := func() {
 		renderPassDescriptor.ColorAttachments[0].View = context.GetCurrentTexture().CreateView()
 		commandEncoder := device.CreateCommandEncoder()
+
+		simParams.time += simParams.deltaT
+		simParamBuffer.UpdateBufferStruct(simParams)
 
 		commandEncoder.ClearBuffer(contactsBuffer.Buffer(), 0, contactsBuffer.BufferSize())
 
