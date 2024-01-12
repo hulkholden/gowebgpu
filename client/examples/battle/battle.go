@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	numParticles = 500
+	numParticles = 2000
 
 	maxContactCount = 1024
 	maxFreeIDsCount = numParticles
