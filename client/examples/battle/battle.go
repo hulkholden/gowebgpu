@@ -307,8 +307,46 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
 	)
 
+	makeUniformBinding := func(idx int) wasmgpu.GPUBindGroupLayoutEntry {
+		return wasmgpu.GPUBindGroupLayoutEntry{
+			Binding:    wasmgpu.GPUIndex32(idx),
+			Visibility: wasmgpu.GPUShaderStageFlagsCompute,
+			Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
+				Type: opt.V(wasmgpu.GPUBufferBindingTypeUniform),
+			}),
+		}
+	}
+
+	makeStorageBinding := func(idx int) wasmgpu.GPUBindGroupLayoutEntry {
+		return wasmgpu.GPUBindGroupLayoutEntry{
+			Binding:    wasmgpu.GPUIndex32(idx),
+			Visibility: wasmgpu.GPUShaderStageFlagsCompute,
+			Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
+				Type: opt.V(wasmgpu.GPUBufferBindingTypeStorage),
+			}),
+		}
+	}
+
+	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
+		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
+			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
+				Entries: []wasmgpu.GPUBindGroupLayoutEntry{
+					makeUniformBinding(0),
+					makeStorageBinding(1),
+					makeStorageBinding(2),
+					makeStorageBinding(3),
+					makeStorageBinding(4),
+					makeStorageBinding(5),
+					makeStorageBinding(6),
+					makeStorageBinding(7),
+				},
+			}),
+		},
+	})
+
 	cpf := computePassFactory{
 		device:                 device,
+		layout:                 layout,
 		computeShaderModule:    computeShaderModule,
 		allBindingGroupEntries: allBindingGroupEntries,
 		computePassDescriptor:  computePassDescriptor,
@@ -388,13 +426,14 @@ type ComputePass func(commandEncoder wasmgpu.GPUCommandEncoder)
 type computePassFactory struct {
 	device                 wasmgpu.GPUDevice
 	computeShaderModule    wasmgpu.GPUShaderModule
+	layout                 wasmgpu.GPUPipelineLayout
 	allBindingGroupEntries []wasmgpu.GPUBindGroupEntry
 	computePassDescriptor  wasmgpu.GPUComputePassDescriptor
 }
 
 func (cpf computePassFactory) initPass(entryPoint string, numWorkgroups int) ComputePass {
 	pipeline := cpf.device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
-		// Layout: "auto",
+		Layout: opt.V(cpf.layout),
 		Compute: wasmgpu.GPUProgrammableStage{
 			Module:     cpf.computeShaderModule,
 			EntryPoint: entryPoint,
