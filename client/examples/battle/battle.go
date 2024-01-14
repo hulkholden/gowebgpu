@@ -308,7 +308,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
 	)
 
-	passes := []func(commandEncoder wasmgpu.GPUCommandEncoder){
+	passes := []Pass{
 		initComputeAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
 		initApplyAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
 		initComputeCollisionsPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
@@ -374,7 +374,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initComputeAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+type Pass func(commandEncoder wasmgpu.GPUCommandEncoder)
+
+func initComputeAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
@@ -395,7 +397,7 @@ func initComputeAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule w
 	}
 }
 
-func initApplyAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+func initApplyAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
@@ -416,7 +418,7 @@ func initApplyAccelerationPass(device wasmgpu.GPUDevice, computeShaderModule was
 	}
 }
 
-func initComputeCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+func initComputeCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
@@ -437,7 +439,7 @@ func initComputeCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule was
 	}
 }
 
-func initApplyCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+func initApplyCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
@@ -459,7 +461,7 @@ func initApplyCollisionsPass(device wasmgpu.GPUDevice, computeShaderModule wasmg
 	}
 }
 
-func initUpdateMissileLifecyclePass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+func initUpdateMissileLifecyclePass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
@@ -482,7 +484,7 @@ func initUpdateMissileLifecyclePass(device wasmgpu.GPUDevice, computeShaderModul
 	}
 }
 
-func initSpawnMissilesPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) func(commandEncoder wasmgpu.GPUCommandEncoder) {
+func initSpawnMissilesPass(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, allBindingGroupEntries []wasmgpu.GPUBindGroupEntry, computePassDescriptor wasmgpu.GPUComputePassDescriptor) Pass {
 	pipeline := device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
