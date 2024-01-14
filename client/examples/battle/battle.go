@@ -308,20 +308,20 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
 	)
 
-	pf := passFactory{
+	cpf := computePassFactory{
 		device:                 device,
 		computeShaderModule:    computeShaderModule,
 		allBindingGroupEntries: allBindingGroupEntries,
 		computePassDescriptor:  computePassDescriptor,
 	}
 
-	passes := []Pass{
-		pf.initPass("computeAcceleration", particleWorkgroups),
-		pf.initPass("applyAcceleration", particleWorkgroups),
-		pf.initPass("computeCollisions", particleWorkgroups),
-		pf.initPass("applyCollisions", 1),
-		pf.initPass("updateMissileLifecycle", particleWorkgroups),
-		pf.initPass("spawnMissiles", particleWorkgroups),
+	computePasses := []ComputePass{
+		cpf.initPass("computeAcceleration", particleWorkgroups),
+		cpf.initPass("applyAcceleration", particleWorkgroups),
+		cpf.initPass("computeCollisions", particleWorkgroups),
+		cpf.initPass("applyCollisions", 1),
+		cpf.initPass("updateMissileLifecycle", particleWorkgroups),
+		cpf.initPass("spawnMissiles", particleWorkgroups),
 	}
 
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
@@ -350,7 +350,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 		commandEncoder.ClearBuffer(contactsBuffer.Buffer(), 0, contactsBuffer.BufferSize())
 
-		for _, pass := range passes {
+		for _, pass := range computePasses {
 			pass(commandEncoder)
 		}
 
@@ -381,29 +381,29 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-type Pass func(commandEncoder wasmgpu.GPUCommandEncoder)
+type ComputePass func(commandEncoder wasmgpu.GPUCommandEncoder)
 
-type passFactory struct {
+type computePassFactory struct {
 	device                 wasmgpu.GPUDevice
 	computeShaderModule    wasmgpu.GPUShaderModule
 	allBindingGroupEntries []wasmgpu.GPUBindGroupEntry
 	computePassDescriptor  wasmgpu.GPUComputePassDescriptor
 }
 
-func (pf passFactory) initPass(entryPoint string, numWorkgroups int) Pass {
-	pipeline := pf.device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
+func (cpf computePassFactory) initPass(entryPoint string, numWorkgroups int) ComputePass {
+	pipeline := cpf.device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
 		// Layout: "auto",
 		Compute: wasmgpu.GPUProgrammableStage{
-			Module:     pf.computeShaderModule,
+			Module:     cpf.computeShaderModule,
 			EntryPoint: entryPoint,
 		},
 	})
-	bindGroup := pf.device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
+	bindGroup := cpf.device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 		Layout:  pipeline.GetBindGroupLayout(0),
-		Entries: pf.allBindingGroupEntries,
+		Entries: cpf.allBindingGroupEntries,
 	})
 	return func(commandEncoder wasmgpu.GPUCommandEncoder) {
-		passEncoder := commandEncoder.BeginComputePass(opt.V(pf.computePassDescriptor))
+		passEncoder := commandEncoder.BeginComputePass(opt.V(cpf.computePassDescriptor))
 		passEncoder.SetPipeline(pipeline)
 		passEncoder.SetBindGroup(0, bindGroup, nil)
 		passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(numWorkgroups), 0, 0)
