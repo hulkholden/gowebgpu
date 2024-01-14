@@ -308,12 +308,14 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
 	)
 
-	computeAccelerationPass := initComputeAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
-	applyAccelerationPass := initApplyAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
-	computeCollisionsPass := initComputeCollisionsPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
-	applyCollisionsPass := initApplyCollisionsPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
-	updateMissileLifecyclePass := initUpdateMissileLifecyclePass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
-	spawnMissilesPass := initSpawnMissilesPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor)
+	passes := []func(commandEncoder wasmgpu.GPUCommandEncoder){
+		initComputeAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+		initApplyAccelerationPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+		initComputeCollisionsPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+		initApplyCollisionsPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+		initUpdateMissileLifecyclePass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+		initSpawnMissilesPass(device, computeShaderModule, allBindingGroupEntries, computePassDescriptor),
+	}
 
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
 		ColorAttachments: []wasmgpu.GPURenderPassColorAttachment{
@@ -341,12 +343,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 		commandEncoder.ClearBuffer(contactsBuffer.Buffer(), 0, contactsBuffer.BufferSize())
 
-		computeAccelerationPass(commandEncoder)
-		applyAccelerationPass(commandEncoder)
-		computeCollisionsPass(commandEncoder)
-		applyCollisionsPass(commandEncoder)
-		updateMissileLifecyclePass(commandEncoder)
-		spawnMissilesPass(commandEncoder)
+		for _, pass := range passes {
+			pass(commandEncoder)
+		}
 
 		{
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
