@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	numParticles       = 2000
-	particleWorkgroups = (numParticles + 63) / 64
+	numParticles = 2000
 
 	maxContactCount = 1024
 	maxFreeIDsCount = numParticles
@@ -315,13 +314,14 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		computePassDescriptor:  computePassDescriptor,
 	}
 
+	numParticleWorkgroups := (numParticles + 63) / 64
 	computePasses := []ComputePass{
-		cpf.initPass("computeAcceleration", particleWorkgroups),
-		cpf.initPass("applyAcceleration", particleWorkgroups),
-		cpf.initPass("computeCollisions", particleWorkgroups),
+		cpf.initPass("computeAcceleration", numParticleWorkgroups),
+		cpf.initPass("applyAcceleration", numParticleWorkgroups),
+		cpf.initPass("computeCollisions", numParticleWorkgroups),
 		cpf.initPass("applyCollisions", 1),
-		cpf.initPass("updateMissileLifecycle", particleWorkgroups),
-		cpf.initPass("spawnMissiles", particleWorkgroups),
+		cpf.initPass("updateMissileLifecycle", numParticleWorkgroups),
+		cpf.initPass("spawnMissiles", numParticleWorkgroups),
 	}
 
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
