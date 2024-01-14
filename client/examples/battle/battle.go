@@ -327,6 +327,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		}
 	}
 
+	// TODO: figure out how to tie this to the @bindings specified in the wgsl and
+	// allBindingGroupEntries above.
 	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
 		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
 			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
