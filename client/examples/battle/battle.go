@@ -314,7 +314,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		computePassDescriptor:  computePassDescriptor,
 	}
 
-	numParticleWorkgroups := (numParticles + 63) / 64
+	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
+	workgroupSize := 64
+	numParticleWorkgroups := (numParticles + (workgroupSize - 1)) / workgroupSize
 	computePasses := []ComputePass{
 		cpf.initPass("computeAcceleration", numParticleWorkgroups),
 		cpf.initPass("applyAcceleration", numParticleWorkgroups),
