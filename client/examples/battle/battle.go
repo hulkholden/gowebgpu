@@ -297,7 +297,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
 
 	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
-	buffers := []computePassBuffer{
+	buffers := []engine.ComputePassBuffer{
 		simParamBuffer,
 		bodyBuffer,
 		particleBuffer,
@@ -308,18 +308,18 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		freeIDsBuffer,
 	}
 
-	cpf := newComputePassFactory(device, computeShaderModule, computePassDescriptor, buffers)
+	cpf := engine.NewComputePassFactory(device, computeShaderModule, computePassDescriptor, buffers)
 
 	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
 	workgroupSize := 64
 	numParticleWorkgroups := (numParticles + (workgroupSize - 1)) / workgroupSize
-	computePasses := []ComputePass{
-		cpf.initPass("computeAcceleration", numParticleWorkgroups),
-		cpf.initPass("applyAcceleration", numParticleWorkgroups),
-		cpf.initPass("computeCollisions", numParticleWorkgroups),
-		cpf.initPass("applyCollisions", 1),
-		cpf.initPass("updateMissileLifecycle", numParticleWorkgroups),
-		cpf.initPass("spawnMissiles", numParticleWorkgroups),
+	computePasses := []engine.ComputePass{
+		cpf.InitPass("computeAcceleration", numParticleWorkgroups),
+		cpf.InitPass("applyAcceleration", numParticleWorkgroups),
+		cpf.InitPass("computeCollisions", numParticleWorkgroups),
+		cpf.InitPass("applyCollisions", 1),
+		cpf.InitPass("updateMissileLifecycle", numParticleWorkgroups),
+		cpf.InitPass("spawnMissiles", numParticleWorkgroups),
 	}
 
 	renderPassDescriptor := wasmgpu.GPURenderPassDescriptor{
@@ -377,67 +377,6 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	engine.InitRenderCallback(update)
 	return nil
-}
-
-type ComputePass func(commandEncoder wasmgpu.GPUCommandEncoder)
-
-type computePassBuffer interface {
-	MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
-	MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry
-}
-
-type computePassFactory struct {
-	device                wasmgpu.GPUDevice
-	computeShaderModule   wasmgpu.GPUShaderModule
-	computePassDescriptor wasmgpu.GPUComputePassDescriptor
-
-	layout           wasmgpu.GPUPipelineLayout
-	bindGroupEntries []wasmgpu.GPUBindGroupEntry
-}
-
-func newComputePassFactory(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, computePassDescriptor wasmgpu.GPUComputePassDescriptor, buffers []computePassBuffer) computePassFactory {
-	bindGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))
-	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
-	for i, b := range buffers {
-		bindGroupEntries[i] = b.MakeBindingGroupEntry(i)
-		bindGroupLayoutEntries[i] = b.MakeBindGroupLayoutEntry(i)
-	}
-
-	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
-		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
-			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
-				Entries: bindGroupLayoutEntries,
-			}),
-		},
-	})
-	return computePassFactory{
-		device:                device,
-		layout:                layout,
-		computeShaderModule:   computeShaderModule,
-		bindGroupEntries:      bindGroupEntries,
-		computePassDescriptor: computePassDescriptor,
-	}
-}
-
-func (cpf computePassFactory) initPass(entryPoint string, numWorkgroups int) ComputePass {
-	pipeline := cpf.device.CreateComputePipeline(wasmgpu.GPUComputePipelineDescriptor{
-		Layout: opt.V(cpf.layout),
-		Compute: wasmgpu.GPUProgrammableStage{
-			Module:     cpf.computeShaderModule,
-			EntryPoint: entryPoint,
-		},
-	})
-	bindGroup := cpf.device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
-		Layout:  pipeline.GetBindGroupLayout(0),
-		Entries: cpf.bindGroupEntries,
-	})
-	return func(commandEncoder wasmgpu.GPUCommandEncoder) {
-		passEncoder := commandEncoder.BeginComputePass(opt.V(cpf.computePassDescriptor))
-		passEncoder.SetPipeline(pipeline)
-		passEncoder.SetBindGroup(0, bindGroup, nil)
-		passEncoder.DispatchWorkgroups(wasmgpu.GPUSize32(numWorkgroups), 0, 0)
-		passEncoder.End()
-	}
 }
 
 func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Missile) {

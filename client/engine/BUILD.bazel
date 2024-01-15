@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "buffer.go",
         "buffer_options.go",
+        "compute_pass.go",
         "engine.go",
         "types.go",
         "wasmgpu_helpers.go",
