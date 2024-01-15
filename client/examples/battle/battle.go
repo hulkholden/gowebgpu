@@ -296,13 +296,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
 
-	type Buffer interface {
-		MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
-		MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry
-	}
-
 	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
-	buffers := []Buffer{
+	buffers := []computePassBuffer{
 		simParamBuffer,
 		bodyBuffer,
 		particleBuffer,
@@ -313,28 +308,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		freeIDsBuffer,
 	}
 
-	bindGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))
-	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
-	for i, b := range buffers {
-		bindGroupEntries[i] = b.MakeBindingGroupEntry(i)
-		bindGroupLayoutEntries[i] = b.MakeBindGroupLayoutEntry(i)
-	}
-
-	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
-		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
-			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
-				Entries: bindGroupLayoutEntries,
-			}),
-		},
-	})
-
-	cpf := computePassFactory{
-		device:                device,
-		layout:                layout,
-		computeShaderModule:   computeShaderModule,
-		bindGroupEntries:      bindGroupEntries,
-		computePassDescriptor: computePassDescriptor,
-	}
+	cpf := newComputePassFactory(device, computeShaderModule, computePassDescriptor, buffers)
 
 	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
 	workgroupSize := 64
@@ -407,12 +381,42 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 type ComputePass func(commandEncoder wasmgpu.GPUCommandEncoder)
 
+type computePassBuffer interface {
+	MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
+	MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry
+}
+
 type computePassFactory struct {
 	device                wasmgpu.GPUDevice
 	computeShaderModule   wasmgpu.GPUShaderModule
-	layout                wasmgpu.GPUPipelineLayout
-	bindGroupEntries      []wasmgpu.GPUBindGroupEntry
 	computePassDescriptor wasmgpu.GPUComputePassDescriptor
+
+	layout           wasmgpu.GPUPipelineLayout
+	bindGroupEntries []wasmgpu.GPUBindGroupEntry
+}
+
+func newComputePassFactory(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, computePassDescriptor wasmgpu.GPUComputePassDescriptor, buffers []computePassBuffer) computePassFactory {
+	bindGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))
+	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
+	for i, b := range buffers {
+		bindGroupEntries[i] = b.MakeBindingGroupEntry(i)
+		bindGroupLayoutEntries[i] = b.MakeBindGroupLayoutEntry(i)
+	}
+
+	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
+		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
+			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
+				Entries: bindGroupLayoutEntries,
+			}),
+		},
+	})
+	return computePassFactory{
+		device:                device,
+		layout:                layout,
+		computeShaderModule:   computeShaderModule,
+		bindGroupEntries:      bindGroupEntries,
+		computePassDescriptor: computePassDescriptor,
+	}
 }
 
 func (cpf computePassFactory) initPass(entryPoint string, numWorkgroups int) ComputePass {
