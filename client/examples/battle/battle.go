@@ -297,8 +297,8 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
 
 	type Buffer interface {
-		Buffer() wasmgpu.GPUBuffer
 		MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
+		MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry
 	}
 
 	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
@@ -313,18 +313,13 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		freeIDsBuffer,
 	}
 
-	bufferBindings := make([]wasmgpu.GPUBindingResource, len(buffers))
-	for i, b := range buffers {
-		bufferBindings[i] = wasmgpu.GPUBufferBinding{
-			Buffer: b.Buffer(),
-		}
-	}
-	allBindingGroupEntries := engine.MakeGPUBindingGroupEntries(bufferBindings...)
-
+	allBindingGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))
 	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
 	for i, b := range buffers {
+		allBindingGroupEntries[i] = b.MakeBindingGroupEntry(i)
 		bindGroupLayoutEntries[i] = b.MakeBindGroupLayoutEntry(i)
 	}
+
 	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
 		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
 			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{

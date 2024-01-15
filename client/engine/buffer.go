@@ -33,6 +33,15 @@ func (b GPUBuffer[T]) MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayo
 	}
 }
 
+func (b GPUBuffer[T]) MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry {
+	return wasmgpu.GPUBindGroupEntry{
+		Binding: wasmgpu.GPUIndex32(idx),
+		Resource: wasmgpu.GPUBufferBinding{
+			Buffer: b.Buffer(),
+		},
+	}
+}
+
 func (b GPUBuffer[T]) BufferSize() wasmgpu.GPUSize64 {
 	return wasmgpu.GPUSize64(b.size)
 }

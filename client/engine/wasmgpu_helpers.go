@@ -37,17 +37,6 @@ func mustFormatFromFieldType(fieldType wgsltypes.TypeName) wasmgpu.GPUVertexForm
 	return format
 }
 
-func MakeGPUBindingGroupEntries(resources ...wasmgpu.GPUBindingResource) []wasmgpu.GPUBindGroupEntry {
-	entries := make([]wasmgpu.GPUBindGroupEntry, len(resources))
-	for idx, resource := range resources {
-		entries[idx] = wasmgpu.GPUBindGroupEntry{
-			Binding:  wasmgpu.GPUIndex32(idx),
-			Resource: resource,
-		}
-	}
-	return entries
-}
-
 type BufferDescriptor struct {
 	Struct *wgsltypes.Struct
 	// Instanced specifices whether the buffer is stepped as a vertex or instance buffer.
