@@ -296,52 +296,39 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
 
-	allBindingGroupEntries := engine.MakeGPUBindingGroupEntries(
-		wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: bodyBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: particleBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: shipsBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: missilesBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: accelerationsBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: contactsBuffer.Buffer()},
-		wasmgpu.GPUBufferBinding{Buffer: freeIDsBuffer.Buffer()},
-	)
-
-	makeUniformBinding := func(idx int) wasmgpu.GPUBindGroupLayoutEntry {
-		return wasmgpu.GPUBindGroupLayoutEntry{
-			Binding:    wasmgpu.GPUIndex32(idx),
-			Visibility: wasmgpu.GPUShaderStageFlagsCompute,
-			Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
-				Type: opt.V(wasmgpu.GPUBufferBindingTypeUniform),
-			}),
-		}
+	type Buffer interface {
+		Buffer() wasmgpu.GPUBuffer
+		MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
 	}
 
-	makeStorageBinding := func(idx int) wasmgpu.GPUBindGroupLayoutEntry {
-		return wasmgpu.GPUBindGroupLayoutEntry{
-			Binding:    wasmgpu.GPUIndex32(idx),
-			Visibility: wasmgpu.GPUShaderStageFlagsCompute,
-			Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
-				Type: opt.V(wasmgpu.GPUBufferBindingTypeStorage),
-			}),
-		}
+	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
+	buffers := []Buffer{
+		simParamBuffer,
+		bodyBuffer,
+		particleBuffer,
+		shipsBuffer,
+		missilesBuffer,
+		accelerationsBuffer,
+		contactsBuffer,
+		freeIDsBuffer,
 	}
 
-	// TODO: figure out how to tie this to the @bindings specified in the wgsl and
-	// allBindingGroupEntries above.
+	bufferBindings := make([]wasmgpu.GPUBindingResource, len(buffers))
+	for i, b := range buffers {
+		bufferBindings[i] = wasmgpu.GPUBufferBinding{
+			Buffer: b.Buffer(),
+		}
+	}
+	allBindingGroupEntries := engine.MakeGPUBindingGroupEntries(bufferBindings...)
+
+	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
+	for i, b := range buffers {
+		bindGroupLayoutEntries[i] = b.MakeBindGroupLayoutEntry(i)
+	}
 	layout := device.CreatePipelineLayout(wasmgpu.GPUPipelineLayoutDescriptor{
 		BindGroupLayouts: []wasmgpu.GPUBindGroupLayout{
 			device.CreateBindGroupLayout(wasmgpu.GPUBindGroupLayoutDescriptor{
-				Entries: []wasmgpu.GPUBindGroupLayoutEntry{
-					makeUniformBinding(0),
-					makeStorageBinding(1),
-					makeStorageBinding(2),
-					makeStorageBinding(3),
-					makeStorageBinding(4),
-					makeStorageBinding(5),
-					makeStorageBinding(6),
-					makeStorageBinding(7),
-				},
+				Entries: bindGroupLayoutEntries,
 			}),
 		},
 	})

@@ -11,6 +11,8 @@ type GPUBuffer[T any] struct {
 	device wasmgpu.GPUDevice
 	buffer wasmgpu.GPUBuffer
 	size   int
+
+	bindingType wasmgpu.GPUBufferBindingType
 }
 
 type DebugBuffer[T any] struct {
@@ -19,6 +21,16 @@ type DebugBuffer[T any] struct {
 
 func (b GPUBuffer[T]) Buffer() wasmgpu.GPUBuffer {
 	return b.buffer
+}
+
+func (b GPUBuffer[T]) MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry {
+	return wasmgpu.GPUBindGroupLayoutEntry{
+		Binding:    wasmgpu.GPUIndex32(idx),
+		Visibility: wasmgpu.GPUShaderStageFlagsCompute,
+		Buffer: opt.V(wasmgpu.GPUBufferBindingLayout{
+			Type: opt.V(b.bindingType),
+		}),
+	}
 }
 
 func (b GPUBuffer[T]) BufferSize() wasmgpu.GPUSize64 {
@@ -51,9 +63,10 @@ func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...B
 	data := structAsByteSlice(value)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
 	return GPUBuffer[T]{
-		device: device,
-		buffer: buffer,
-		size:   len(data),
+		device:      device,
+		buffer:      buffer,
+		size:        len(data),
+		bindingType: wasmgpu.GPUBufferBindingTypeStorage,
 	}
 }
 
@@ -61,9 +74,10 @@ func InitStorageBufferSlice[T any](device wasmgpu.GPUDevice, values []T, opts ..
 	data := sliceAsBytesSlice(values)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
 	return GPUBuffer[T]{
-		device: device,
-		buffer: buffer,
-		size:   len(data),
+		device:      device,
+		buffer:      buffer,
+		size:        len(data),
+		bindingType: wasmgpu.GPUBufferBindingTypeStorage,
 	}
 }
 
@@ -71,9 +85,10 @@ func InitUniformBuffer[T any](device wasmgpu.GPUDevice, value T, opts ...BufferO
 	data := structAsByteSlice(value)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsUniform, data, true, opts...)
 	return GPUBuffer[T]{
-		device: device,
-		buffer: buffer,
-		size:   len(data),
+		device:      device,
+		buffer:      buffer,
+		size:        len(data),
+		bindingType: wasmgpu.GPUBufferBindingTypeUniform,
 	}
 }
 
@@ -82,9 +97,10 @@ func InitDebugBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...Buffer
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsMapRead|wasmgpu.GPUBufferUsageFlagsCopyDst, data, false, opts...)
 	return DebugBuffer[T]{
 		GPUBuffer: GPUBuffer[T]{
-			device: device,
-			buffer: buffer,
-			size:   len(data),
+			device:      device,
+			buffer:      buffer,
+			size:        len(data),
+			bindingType: wasmgpu.GPUBufferBindingTypeStorage,
 		},
 	}
 }
