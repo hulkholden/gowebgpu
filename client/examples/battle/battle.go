@@ -292,10 +292,6 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 
 	// Compute
-	computeShaderModule := engine.InitShaderModule(device, computeShaderCode, structDefinitions)
-
-	computePassDescriptor := wasmgpu.GPUComputePassDescriptor{}
-
 	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
 	buffers := []engine.ComputePassBuffer{
 		simParamBuffer,
@@ -308,7 +304,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		freeIDsBuffer,
 	}
 
-	cpf := engine.NewComputePassFactory(device, computeShaderModule, computePassDescriptor, buffers)
+	cpf := engine.NewComputePassFactory(device, computeShaderCode, structDefinitions, buffers)
 
 	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
 	workgroupSize := 64

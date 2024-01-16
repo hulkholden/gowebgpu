@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -21,7 +22,9 @@ type ComputePassFactory struct {
 	bindGroupEntries []wasmgpu.GPUBindGroupEntry
 }
 
-func NewComputePassFactory(device wasmgpu.GPUDevice, computeShaderModule wasmgpu.GPUShaderModule, computePassDescriptor wasmgpu.GPUComputePassDescriptor, buffers []ComputePassBuffer) ComputePassFactory {
+func NewComputePassFactory(device wasmgpu.GPUDevice, computeShaderCode string, structDefinitions []wgsltypes.Struct, buffers []ComputePassBuffer) ComputePassFactory {
+	computeShaderModule := InitShaderModule(device, computeShaderCode, structDefinitions)
+
 	bindGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))
 	bindGroupLayoutEntries := make([]wasmgpu.GPUBindGroupLayoutEntry, len(buffers))
 	for i, b := range buffers {
@@ -41,7 +44,7 @@ func NewComputePassFactory(device wasmgpu.GPUDevice, computeShaderModule wasmgpu
 		layout:                layout,
 		computeShaderModule:   computeShaderModule,
 		bindGroupEntries:      bindGroupEntries,
-		computePassDescriptor: computePassDescriptor,
+		computePassDescriptor: wasmgpu.GPUComputePassDescriptor{},
 	}
 }
 
