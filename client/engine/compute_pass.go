@@ -9,6 +9,7 @@ import (
 type ComputePass func(commandEncoder wasmgpu.GPUCommandEncoder)
 
 type ComputePassBuffer interface {
+	StructDefs() []wgsltypes.Struct
 	MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry
 	MakeBindingGroupEntry(idx int) wasmgpu.GPUBindGroupEntry
 }
@@ -22,7 +23,13 @@ type ComputePassFactory struct {
 	bindGroupEntries []wasmgpu.GPUBindGroupEntry
 }
 
-func NewComputePassFactory(device wasmgpu.GPUDevice, computeShaderCode string, structDefinitions []wgsltypes.Struct, buffers []ComputePassBuffer) ComputePassFactory {
+func NewComputePassFactory(device wasmgpu.GPUDevice, computeShaderCode string, extraStructDefinitions []wgsltypes.Struct, buffers []ComputePassBuffer) ComputePassFactory {
+	structDefinitions := []wgsltypes.Struct{}
+	for _, b := range buffers {
+		structDefinitions = append(structDefinitions, b.StructDefs()...)
+	}
+	structDefinitions = append(structDefinitions, extraStructDefinitions...)
+
 	computeShaderModule := InitShaderModule(device, computeShaderCode, structDefinitions)
 
 	bindGroupEntries := make([]wasmgpu.GPUBindGroupEntry, len(buffers))

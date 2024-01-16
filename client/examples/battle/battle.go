@@ -161,16 +161,10 @@ type Vertex struct {
 }
 
 var (
-	simParamsStruct         = wgsltypes.MustRegisterStruct[SimParams]()
-	bodyStruct              = wgsltypes.MustRegisterStruct[Body]()
-	particleStruct          = wgsltypes.MustRegisterStruct[Particle]()
-	shipStruct              = wgsltypes.MustRegisterStruct[Ship]()
-	missileStruct           = wgsltypes.MustRegisterStruct[Missile]()
-	accelerationStruct      = wgsltypes.MustRegisterStruct[Acceleration]()
-	vertexStruct            = wgsltypes.MustRegisterStruct[Vertex]()
-	contactStruct           = wgsltypes.MustRegisterStruct[Contact]()
-	contactsContainerStruct = wgsltypes.MustRegisterStruct[ContactsContainer]()
-	freeIDsContainerStruct  = wgsltypes.MustRegisterStruct[FreeIDsContainer]()
+	bodyStruct     = wgsltypes.MustRegisterStruct[Body]()
+	particleStruct = wgsltypes.MustRegisterStruct[Particle]()
+	vertexStruct   = wgsltypes.MustRegisterStruct[Vertex]()
+	contactStruct  = wgsltypes.MustRegisterStruct[Contact]()
 )
 
 //go:embed compute.wgsl
@@ -237,6 +231,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	const particleBufferIdx = 1
 	const vertexBufferIdx = 2
 
+	// TODO: invert this so we maintain a slice of buffers (like for compute) and get the structs from them.
 	bufDefs := []engine.BufferDescriptor{
 		{Struct: &bodyStruct, Instanced: true},
 		{Struct: &particleStruct, Instanced: true},
@@ -279,20 +274,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
 
-	structDefinitions := []wgsltypes.Struct{
-		simParamsStruct,
-		bodyStruct,
-		particleStruct,
-		shipStruct,
-		missileStruct,
-		accelerationStruct,
-		contactStruct,
-		contactsContainerStruct,
-		freeIDsContainerStruct,
-	}
-
-	// Compute
-	// TODO: figure out how to tie this to the @bindings specified in the wgsl.
+	// TODO: figure out how to tie this order to the @bindings specified in the wgsl.
 	buffers := []engine.ComputePassBuffer{
 		simParamBuffer,
 		bodyBuffer,
@@ -303,8 +285,13 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		contactsBuffer,
 		freeIDsBuffer,
 	}
+	// TODO: ideally wgsltypes should return a set of all the reachable types from the buffer.
+	extraStructDefinitions := []wgsltypes.Struct{
+		contactStruct,
+	}
 
-	cpf := engine.NewComputePassFactory(device, computeShaderCode, structDefinitions, buffers)
+	// Compute
+	cpf := engine.NewComputePassFactory(device, computeShaderCode, extraStructDefinitions, buffers)
 
 	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
 	workgroupSize := 64

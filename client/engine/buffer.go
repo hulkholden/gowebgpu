@@ -1,8 +1,10 @@
 package engine
 
 import (
+	"reflect"
 	"syscall/js"
 
+	"github.com/hulkholden/gowebgpu/common/wgsltypes"
 	"github.com/mokiat/gog/opt"
 	"github.com/mokiat/wasmgpu"
 )
@@ -13,6 +15,7 @@ type GPUBuffer[T any] struct {
 	size   int
 
 	bindingType wasmgpu.GPUBufferBindingType
+	structDefs  []wgsltypes.Struct
 }
 
 type DebugBuffer[T any] struct {
@@ -21,6 +24,10 @@ type DebugBuffer[T any] struct {
 
 func (b GPUBuffer[T]) Buffer() wasmgpu.GPUBuffer {
 	return b.buffer
+}
+
+func (b GPUBuffer[T]) StructDefs() []wgsltypes.Struct {
+	return b.structDefs
 }
 
 func (b GPUBuffer[T]) MakeBindGroupLayoutEntry(idx int) wasmgpu.GPUBindGroupLayoutEntry {
@@ -68,6 +75,16 @@ func initBuffer(device wasmgpu.GPUDevice, usage wasmgpu.GPUBufferUsageFlags, dat
 	return buffer
 }
 
+func registerStruct[T any]() []wgsltypes.Struct {
+	var t T
+	structType := reflect.TypeOf(t)
+
+	if structType.Kind() != reflect.Struct {
+		return nil
+	}
+	return []wgsltypes.Struct{wgsltypes.MustRegisterStruct[T]()}
+}
+
 func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...BufferOption) GPUBuffer[T] {
 	data := structAsByteSlice(value)
 	buffer := initBuffer(device, wasmgpu.GPUBufferUsageFlagsStorage, data, true, opts...)
@@ -76,6 +93,7 @@ func InitStorageBufferStruct[T any](device wasmgpu.GPUDevice, value T, opts ...B
 		buffer:      buffer,
 		size:        len(data),
 		bindingType: wasmgpu.GPUBufferBindingTypeStorage,
+		structDefs:  registerStruct[T](),
 	}
 }
 
@@ -87,6 +105,7 @@ func InitStorageBufferSlice[T any](device wasmgpu.GPUDevice, values []T, opts ..
 		buffer:      buffer,
 		size:        len(data),
 		bindingType: wasmgpu.GPUBufferBindingTypeStorage,
+		structDefs:  registerStruct[T](),
 	}
 }
 
@@ -98,6 +117,7 @@ func InitUniformBuffer[T any](device wasmgpu.GPUDevice, value T, opts ...BufferO
 		buffer:      buffer,
 		size:        len(data),
 		bindingType: wasmgpu.GPUBufferBindingTypeUniform,
+		structDefs:  registerStruct[T](),
 	}
 }
 
@@ -110,6 +130,7 @@ func InitDebugBuffer[T any](device wasmgpu.GPUDevice, values []T, opts ...Buffer
 			buffer:      buffer,
 			size:        len(data),
 			bindingType: wasmgpu.GPUBufferBindingTypeStorage,
+			structDefs:  registerStruct[T](),
 		},
 	}
 }
