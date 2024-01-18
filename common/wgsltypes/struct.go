@@ -209,16 +209,18 @@ func lookupPrimitiveWGSLType(goTypeName GoTypeName) (Type, bool) {
 		}
 		return Type{}, false
 	}
-	if s, ok := registeredGoStructs[goTypeName]; ok {
-		wgslType := Type{
-			Name:    s.Name,
-			AlignOf: s.Size, // TODO: this should be max(fieldAlignment)
-			SizeOf:  s.Size,
-		}
-		return wgslType, true
+	s, ok := registeredGoStructs[goTypeName]
+	if !ok {
+		fmt.Printf("Couldn't find %q -> %v\n", goTypeName, registeredGoStructs)
+		return Type{}, false
 	}
-	fmt.Printf("Couldn't find %q -> %v\n", goTypeName, registeredGoStructs)
-	return Type{}, false
+
+	wgslType := Type{
+		Name:    s.Name,
+		AlignOf: s.Size, // TODO: this should be max(fieldAlignment)
+		SizeOf:  s.Size,
+	}
+	return wgslType, true
 }
 
 func makeAtomic(t Type) Type {
