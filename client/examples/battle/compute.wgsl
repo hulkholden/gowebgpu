@@ -10,19 +10,6 @@
 @binding(6) @group(0) var<storage, read_write> gContacts : ContactsContainer;
 @binding(7) @group(0) var<storage, read_write> gFreeIDs : FreeIDsContainer;
 
-fn bogusReferences() {
-  // Chrome seems to silently discard unreferenced resources then complain when
-  // they're provided in the bind group.
-  let dummy0 = &params;
-  let dummy1 = &gBodies;
-  let dummy2 = &gParticles;
-  let dummy3 = &gMissiles;
-  let dummy4 = &gShips;
-  let dummy5 = &gAccelerations;
-  let dummy6 = &gContacts;
-  let dummy7 = &gFreeIDs;
-}
-
 const pi = 3.14159265359;
 const twoPi = 2 * pi;
 
@@ -76,7 +63,6 @@ fn modReplacement(x : f32, y : f32) -> f32 {
 
 @compute @workgroup_size(64)
 fn computeAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
 
   let index = GlobalInvocationID.x;
   var acc = Acceleration();
@@ -100,8 +86,6 @@ fn computeAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<
 
 @compute @workgroup_size(64)
 fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
-
   let index = GlobalInvocationID.x;
   var body = gBodies[index];
   let acc = gAccelerations[index];
@@ -128,7 +112,6 @@ fn applyAcceleration(@builtin(global_invocation_id) GlobalInvocationID : vec3<u3
 
 @compute @workgroup_size(64)
 fn computeCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
   let index = GlobalInvocationID.x;
 
   if (particleType(index) == bodyTypeMissile) {
@@ -155,8 +138,6 @@ fn addContact(aIdx : u32, bIdx : u32) {
 // This is not parallelised but the number of contacts should be low each frame.
 @compute @workgroup_size(1)
 fn applyCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
-
   let contactCount = min(atomicLoad(&gContacts.count), u32(arrayLength(&gContacts.elements)));
   for (var contactIdx = 0u; contactIdx < contactCount; contactIdx++) {
     let aIdx = gContacts.elements[contactIdx].aIdx;
@@ -168,8 +149,6 @@ fn applyCollisions(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>
 
 @compute @workgroup_size(64)
 fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
-
   let index = GlobalInvocationID.x;
   if (particleHit(index)) {
     killParticle(index);
@@ -196,8 +175,6 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
 
 @compute @workgroup_size(64)
 fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  bogusReferences();
-
   let index = GlobalInvocationID.x;
 
   switch particleType(index) {
