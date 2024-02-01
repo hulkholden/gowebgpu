@@ -16,14 +16,15 @@ import (
 )
 
 const (
-	numParticles = 2000
+	initialShipCount = 2000
+	maxParticleCount = 4000
 
 	maxContactCount = 1024
-	maxFreeIDsCount = numParticles
+	maxFreeIDsCount = maxParticleCount
 
 	initialVelScale = 100.0
 
-	shipShotCooldown = 3.0
+	shipShotCooldown = 5.0
 
 	enableDebugBuffer = false
 )
@@ -213,7 +214,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	}
 	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
-	bodyData, particleData, shipData, missileData := initParticleData(numParticles, simParams)
+	bodyData, particleData, shipData, missileData, freeIDs := initParticleData(initialShipCount, maxParticleCount, simParams)
 	particleBufferOpts := []engine.BufferOption{engine.WithVertexUsage()}
 	if enableDebugBuffer {
 		particleBufferOpts = append(particleBufferOpts, engine.WithCopySrcUsage())
@@ -222,9 +223,9 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	particleBuffer := engine.InitStorageBufferSlice(device, particleData, particleBufferOpts...)
 	shipsBuffer := engine.InitStorageBufferSlice(device, shipData, particleBufferOpts...)
 	missilesBuffer := engine.InitStorageBufferSlice(device, missileData, particleBufferOpts...)
-	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, numParticles))
+	accelerationsBuffer := engine.InitStorageBufferSlice(device, make([]Acceleration, maxParticleCount))
 	contactsBuffer := engine.InitStorageBufferStruct(device, ContactsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
-	freeIDsBuffer := engine.InitStorageBufferStruct(device, FreeIDsContainer{}, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
+	freeIDsBuffer := engine.InitStorageBufferStruct(device, freeIDs, engine.WithCopyDstUsage(), engine.WithCopySrcUsage())
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const bodyBufferIdx = 0
@@ -295,7 +296,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 	// TODO: this is hard-coded in the shader. Ideally should be passed in somehow.
 	workgroupSize := 64
-	numParticleWorkgroups := (numParticles + (workgroupSize - 1)) / workgroupSize
+	numParticleWorkgroups := (maxParticleCount + (workgroupSize - 1)) / workgroupSize
 	computePasses := []engine.ComputePass{
 		cpf.InitPass("computeAcceleration", numParticleWorkgroups),
 		cpf.InitPass("applyAcceleration", numParticleWorkgroups),
@@ -339,7 +340,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
 			passEncoder.SetPipeline(renderPipeline)
 			vertexBuffers.Bind(passEncoder)
-			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(numParticles)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
+			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(maxParticleCount)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
 			passEncoder.End()
 		}
 
@@ -362,7 +363,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	return nil
 }
 
-func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Missile) {
+func initParticleData(numShips, maxParticles int, params SimParams) ([]Body, []Particle, []Ship, []Missile, FreeIDsContainer) {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 
 	type particleChoice struct {
@@ -379,11 +380,12 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Mi
 		// weightedrand.NewChoice(particleChoice{BodyTypeMissile, 0}, 1),
 	)
 
-	bs := make([]Body, n)
-	ps := make([]Particle, n)
-	ss := make([]Ship, n)
-	ms := make([]Missile, n)
-	for i := 0; i < n; i++ {
+	bs := make([]Body, maxParticles)
+	ps := make([]Particle, maxParticles)
+	ss := make([]Ship, maxParticles)
+	ms := make([]Missile, maxParticles)
+	fids := FreeIDsContainer{}
+	for i := 0; i < numShips; i++ {
 		bs[i].pos = randomLocation(r, params)
 		bs[i].vel = randomVelocity(r)
 		bs[i].angle = 2 * (rand.Float32() - 0.5) * 3.141
@@ -405,8 +407,14 @@ func initParticleData(n int, params SimParams) ([]Body, []Particle, []Ship, []Mi
 		ps[i].metadata = makeMeta(choice.bodyType, choice.team)
 		ps[i].col = uint32(choice.team.Color())
 		ms[i].targetIdx = -1
+
+		ss[i].nextShotTime = rand.Float32() * params.shipShotCooldown
 	}
-	return bs, ps, ss, ms
+	fids.count = uint32(maxParticles - numShips)
+	for i := numShips; i < maxParticles; i++ {
+		fids.elements[i-numShips] = uint32(i)
+	}
+	return bs, ps, ss, ms, fids
 }
 
 func randomLocation(r *rand.Rand, params SimParams) vmath.V2 {
