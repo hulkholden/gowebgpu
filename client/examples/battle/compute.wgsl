@@ -161,12 +161,31 @@ fn updateMissileLifecycle(@builtin(global_invocation_id) GlobalInvocationID : ve
     case bodyTypeShip: {
     }
     case bodyTypeMissile: {
-      updateMissileTarget(index);
       gMissiles[index].age += params.deltaT;
       if (gMissiles[index].age > params.maxMissileAge) {
         killParticle(index);
         return;
       }
+    }
+    default: {
+    }
+  }
+}
+
+@compute @workgroup_size(64)
+fn selectTargets(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  let index = GlobalInvocationID.x;
+
+  switch particleType(index) {
+    case bodyTypeNone: {
+    }
+    case bodyTypeShip: {
+      let ship = gShips[index];
+      if (params.time >= ship.nextShotTime) {
+        gShips[index].targetIdx = findTarget(index);
+      }
+    }
+    case bodyTypeMissile: {
     }
     default: {
     }
@@ -182,13 +201,9 @@ fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) 
     }
     case bodyTypeShip: {
       let ship = gShips[index];
-      if (params.time >= ship.nextShotTime) {
-        // TODO: Would be nicer for ships to check for a target first, then only fire a missile
-        // if there's a target in range.
+      if (params.time >= ship.nextShotTime && ship.targetIdx >= 0) {
         let mIdxSigned = getFreeID();
         if (mIdxSigned >= 0) {
-          gShips[index].nextShotTime = params.time + params.shipShotCooldown;
-
           let mIdx = u32(mIdxSigned);
           // TODO: need to somehow synchronise writes so we're not changing particle types
           // as we're iterating over them.
@@ -197,7 +212,10 @@ fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) 
           gParticles[mIdx].flags = 0;
           gParticles[mIdx].col = 0xffff00ff;
           gMissiles[mIdx].age = 0.0;
-          gMissiles[mIdx].targetIdx = -1;
+          gMissiles[mIdx].targetIdx = ship.targetIdx;
+
+          gShips[index].nextShotTime = params.time + params.shipShotCooldown;
+          gShips[index].targetIdx = -1;
         }
       }
     }
@@ -243,18 +261,6 @@ fn getFreeID() -> i32 {
   return -1;
 }
 
-fn updateMissileTarget(selfIdx : u32) {
-  let missile = gMissiles[selfIdx];
-  let targetIdx = missile.targetIdx;
-  if (targetIdx >= 0) {
-    return;
-  }
-  let newTargetIdx = findTarget(selfIdx);
-  if (newTargetIdx >= 0) {
-    gMissiles[selfIdx].targetIdx = newTargetIdx;
-  }
-}
-
 fn randomizeBody(b : Body) -> Body {
   var newBody = Body();
   newBody.pos = 2.0 * (rand22(b.pos) - 0.5) * 1000.0;
@@ -295,7 +301,7 @@ fn resetParticle(index : u32) {
 fn findTarget(selfIdx : u32) -> i32 {
 	let selfTeam = particleTeam(selfIdx);
   let selfType = particleType(selfIdx);
-	if (selfType != bodyTypeMissile) {
+	if (selfType != bodyTypeShip) {
 		return -1;
 	}
 

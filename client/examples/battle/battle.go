@@ -88,7 +88,7 @@ type Particle struct {
 
 type Ship struct {
 	nextShotTime float32
-	pad          uint32
+	targetIdx    int32
 }
 
 type Missile struct {
@@ -303,6 +303,7 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		cpf.InitPass("computeCollisions", numParticleWorkgroups),
 		cpf.InitPass("applyCollisions", 1),
 		cpf.InitPass("updateMissileLifecycle", numParticleWorkgroups),
+		cpf.InitPass("selectTargets", numParticleWorkgroups),
 		cpf.InitPass("spawnMissiles", numParticleWorkgroups),
 	}
 
@@ -409,6 +410,7 @@ func initParticleData(numShips, maxParticles int, params SimParams) ([]Body, []P
 		ms[i].targetIdx = -1
 
 		ss[i].nextShotTime = rand.Float32() * params.shipShotCooldown
+		ss[i].targetIdx = -1
 	}
 	fids.count = uint32(maxParticles - numShips)
 	for i := numShips; i < maxParticles; i++ {
