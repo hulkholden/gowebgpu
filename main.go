@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -30,6 +31,8 @@ var (
 	port     = flag.Int("port", 80, "http port to listen on")
 	useTLS   = flag.Bool("tls", false, "enable HTTPS with a self-signed certificate")
 	basePath = flag.String("base_path", "", "base path to serve on, e.g. '/foo/'")
+
+	exampleNames = []string{"battle", "boids"}
 )
 
 type server struct {
@@ -47,7 +50,15 @@ func (s server) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := map[string]any{}
+	example := r.URL.Query().Get("example")
+	if !slices.Contains(exampleNames, example) {
+		example = exampleNames[0]
+	}
+
+	data := map[string]any{
+		"Example":      example,
+		"ExampleNames": exampleNames,
+	}
 	indexTmpl.Execute(w, data)
 }
 

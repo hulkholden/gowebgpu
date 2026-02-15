@@ -123,6 +123,10 @@ The `go.mod` contains a `replace` directive pointing `mokiat/wasmgpu` to a custo
 - **`ComputePassBuffer` interface**: GPU buffers implement this interface to provide struct definitions and bind group entries to the compute pipeline factory.
 - **Animation loop**: `engine.InitRenderCallback` sets up a `requestAnimationFrame` loop via JS interop.
 
+## Git Workflow
+
+- Always create new commits rather than amending. Do not use `git commit --amend`.
+
 ## CI/CD
 
 Google Cloud Build pipeline (`cloudbuild.yaml`):
