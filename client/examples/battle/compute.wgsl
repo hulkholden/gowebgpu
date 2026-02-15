@@ -210,7 +210,7 @@ fn spawnMissiles(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) 
           gBodies[mIdx] = gBodies[index];
           gParticles[mIdx].metadata = makeParticleMetadata(bodyTypeMissile, particleTeam(index));
           gParticles[mIdx].flags = 0;
-          gParticles[mIdx].col = 0xffff00ff;
+          gParticles[mIdx].col = 0xffffffff;
           gMissiles[mIdx].age = 0.0;
           gMissiles[mIdx].targetIdx = ship.targetIdx;
 
