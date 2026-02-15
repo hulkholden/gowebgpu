@@ -11,6 +11,7 @@ go_library(
         "wasmgpu_helpers.go",
     ],
     importpath = "github.com/hulkholden/gowebgpu/client/engine",
+    tags = ["manual"],
     visibility = ["//visibility:public"],
     deps = [
         "//client/browser",
