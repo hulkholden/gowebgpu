@@ -25,11 +25,11 @@ const shipVerts = array<vec2<f32>, 3>(
   vec2<f32>(-5.0, -10.0), vec2<f32>(5.0, -10.0), vec2<f32>(0.0, 10.0),
 );
 
-// Missile: pointed tip + rectangular body (3 triangles, 9 vertices).
+// Missile: pencil shape — small conical tip + thin body (3 triangles, 9 vertices).
 const missileVerts = array<vec2<f32>, 9>(
-  vec2<f32>(0.0, 12.0),  vec2<f32>(-1.5, 4.0),  vec2<f32>(1.5, 4.0),   // nose
-  vec2<f32>(-1.5, 4.0),  vec2<f32>(-1.5, -12.0), vec2<f32>(1.5, 4.0),  // body left
-  vec2<f32>(1.5, 4.0),   vec2<f32>(-1.5, -12.0), vec2<f32>(1.5, -12.0) // body right
+  vec2<f32>(0.0, 8.0),  vec2<f32>(-1.0, 5.0), vec2<f32>(1.0, 5.0),  // tip
+  vec2<f32>(-1.0, 5.0), vec2<f32>(-1.0, -7.0), vec2<f32>(1.0, 5.0), // body left
+  vec2<f32>(1.0, 5.0),  vec2<f32>(-1.0, -7.0), vec2<f32>(1.0, -7.0) // body right
 );
 
 fn renderParticle(in : VertexInput, expectedType : u32, localPos : vec2<f32>) -> VertexOutput {
