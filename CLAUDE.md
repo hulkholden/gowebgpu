@@ -33,14 +33,22 @@ gowebgpu/
 
 **Primary build system: Bazel** (with bzlmod enabled via `.bazelrc`).
 
+### Prerequisites
+
+- **Go 1.21+**
+- **Bazel 7.x** (via [Bazelisk](https://github.com/bazelbuild/bazelisk)) — pinned in `.bazelversion`
+- **gcc** (required by Bazel's CC toolchain)
+
 ### Key Commands
 
 ```bash
 # Run the server natively (opens on port 9090)
 bazel run :gowebgpu -- --port=9090
 
-# Build everything
-bazel build //...
+# Build all targets explicitly
+# Note: `bazel build //...` fails because it includes WASM-only library targets
+# (e.g. //client:client_lib) which can't compile for the host platform.
+bazel build //:gowebgpu //client //:gowebgpu_linux //static //common/...
 
 # Run all tests
 bazel test //...
