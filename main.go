@@ -1,14 +1,23 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"embed"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/hulkholden/gowebgpu/static"
 )
@@ -19,6 +28,7 @@ var (
 	indexTmpl   = template.Must(template.ParseFS(templatesFS, "templates/index.html"))
 
 	port     = flag.Int("port", 80, "http port to listen on")
+	useTLS   = flag.Bool("tls", false, "enable HTTPS with a self-signed certificate")
 	basePath = flag.String("base_path", "", "base path to serve on, e.g. '/foo/'")
 )
 
@@ -104,8 +114,64 @@ func main() {
 	// If client.wasm is requested, redirect to a gzipped version.
 	http.Handle(basePath+"static/client.wasm", http.StripPrefix(basePath+"static/", makeGzipHandler(staticHandler)))
 
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), logRequest(http.DefaultServeMux)); err != nil {
-		log.Println("Failed to start server", err)
-		os.Exit(1)
+	addr := fmt.Sprintf(":%d", *port)
+	handler := logRequest(http.DefaultServeMux)
+
+	if *useTLS {
+		tlsCert, err := generateSelfSignedCert()
+		if err != nil {
+			log.Fatalf("Failed to generate self-signed certificate: %v", err)
+		}
+		srv := &http.Server{
+			Addr:    addr,
+			Handler: handler,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{tlsCert},
+			},
+		}
+		log.Printf("Listening on https://0.0.0.0%s", addr)
+		if err := srv.ListenAndServeTLS("", ""); err != nil {
+			log.Println("Failed to start server", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Printf("Listening on http://0.0.0.0%s", addr)
+		if err := http.ListenAndServe(addr, handler); err != nil {
+			log.Println("Failed to start server", err)
+			os.Exit(1)
+		}
 	}
+}
+
+// generateSelfSignedCert creates an in-memory self-signed TLS certificate.
+func generateSelfSignedCert() (tls.Certificate, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("generating key: %v", err)
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("generating serial number: %v", err)
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject:      pkix.Name{Organization: []string{"gowebgpu dev"}},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.IPv4(0, 0, 0, 0), net.IPv6loopback},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &key.PublicKey, key)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("creating certificate: %v", err)
+	}
+
+	return tls.Certificate{
+		Certificate: [][]byte{certDER},
+		PrivateKey:  key,
+	}, nil
 }
