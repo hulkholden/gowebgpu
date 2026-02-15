@@ -157,14 +157,9 @@ func makeMeta(bodyType BodyType, team Team) uint32 {
 	return uint32(bodyType)<<8 | uint32(team)
 }
 
-type Vertex struct {
-	pos vmath.V2
-}
-
 var (
 	bodyStruct     = wgsltypes.MustRegisterStruct[Body]()
 	particleStruct = wgsltypes.MustRegisterStruct[Particle]()
-	vertexStruct   = wgsltypes.MustRegisterStruct[Vertex]()
 	contactStruct  = wgsltypes.MustRegisterStruct[Contact]()
 )
 
@@ -206,14 +201,6 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	simParamBuffer := engine.InitUniformBuffer(device, simParams, engine.WithCopyDstUsage())
 	// TODO: add sim params to GUI.
 
-	const boidScale = 500
-	vertexBufferData := []float32{
-		-0.01 * boidScale, -0.02 * boidScale,
-		+0.01 * boidScale, -0.02 * boidScale,
-		+0.00 * boidScale, +0.02 * boidScale,
-	}
-	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
-
 	bodyData, particleData, shipData, missileData, freeIDs := initParticleData(initialShipCount, maxParticleCount, simParams)
 	particleBufferOpts := []engine.BufferOption{engine.WithVertexUsage()}
 	if enableDebugBuffer {
@@ -230,50 +217,55 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
 	const bodyBufferIdx = 0
 	const particleBufferIdx = 1
-	const vertexBufferIdx = 2
 
 	// TODO: invert this so we maintain a slice of buffers (like for compute) and get the structs from them.
 	bufDefs := []engine.BufferDescriptor{
 		{Struct: &bodyStruct, Instanced: true},
 		{Struct: &particleStruct, Instanced: true},
-		{Struct: &vertexStruct},
 	}
 	vtxAttrs := []engine.VertexAttribute{
 		{BufferIndex: bodyBufferIdx, FieldName: "pos"},
 		{BufferIndex: bodyBufferIdx, FieldName: "angle"},
 		{BufferIndex: particleBufferIdx, FieldName: "metadata"},
 		{BufferIndex: particleBufferIdx, FieldName: "col"},
-		{BufferIndex: vertexBufferIdx, FieldName: "pos"},
 	}
 	vertexBuffers := engine.NewVertexBuffers(bufDefs, vtxAttrs)
 	// TODO: pass into constructor?
 	vertexBuffers.Buffers[bodyBufferIdx] = bodyBuffer.Buffer()
 	vertexBuffers.Buffers[particleBufferIdx] = particleBuffer.Buffer()
-	vertexBuffers.Buffers[vertexBufferIdx] = spriteVertexBuffer.Buffer()
 
 	spriteShaderModule := engine.InitShaderModule(device, renderShaderCode, nil)
-	renderPipelineDescriptor := wasmgpu.GPURenderPipelineDescriptor{
-		// Layout: "auto",
+	fragmentState := opt.V(wasmgpu.GPUFragmentState{
+		Module:     spriteShaderModule,
+		EntryPoint: "fragment_main",
+		Targets: []wasmgpu.GPUColorTargetState{
+			{
+				//Format: navigator.gpu.getPreferredCanvasFormat(),
+				Format: wasmgpu.GPUTextureFormatBGRA8Unorm,
+			},
+		},
+	})
+	primitiveState := opt.V(wasmgpu.GPUPrimitiveState{
+		Topology: opt.V(wasmgpu.GPUPrimitiveTopologyTriangleList),
+	})
+	shipRenderPipeline := device.CreateRenderPipeline(wasmgpu.GPURenderPipelineDescriptor{
 		Vertex: wasmgpu.GPUVertexState{
 			Module:     spriteShaderModule,
-			EntryPoint: "vertex_main",
+			EntryPoint: "vertex_main_ship",
 			Buffers:    vertexBuffers.Layout,
 		},
-		Fragment: opt.V(wasmgpu.GPUFragmentState{
+		Fragment:  fragmentState,
+		Primitive: primitiveState,
+	})
+	missileRenderPipeline := device.CreateRenderPipeline(wasmgpu.GPURenderPipelineDescriptor{
+		Vertex: wasmgpu.GPUVertexState{
 			Module:     spriteShaderModule,
-			EntryPoint: "fragment_main",
-			Targets: []wasmgpu.GPUColorTargetState{
-				{
-					//Format: navigator.gpu.getPreferredCanvasFormat(),
-					Format: wasmgpu.GPUTextureFormatBGRA8Unorm,
-				},
-			},
-		}),
-		Primitive: opt.V(wasmgpu.GPUPrimitiveState{
-			Topology: opt.V(wasmgpu.GPUPrimitiveTopologyTriangleList),
-		}),
-	}
-	renderPipeline := device.CreateRenderPipeline(renderPipelineDescriptor)
+			EntryPoint: "vertex_main_missile",
+			Buffers:    vertexBuffers.Layout,
+		},
+		Fragment:  fragmentState,
+		Primitive: primitiveState,
+	})
 
 	// TODO: figure out how to tie this order to the @bindings specified in the wgsl.
 	buffers := []engine.ComputePassBuffer{
@@ -339,9 +331,15 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 
 		{
 			passEncoder := commandEncoder.BeginRenderPass(renderPassDescriptor)
-			passEncoder.SetPipeline(renderPipeline)
+
+			passEncoder.SetPipeline(shipRenderPipeline)
 			vertexBuffers.Bind(passEncoder)
 			passEncoder.Draw(3, opt.V(wasmgpu.GPUSize32(maxParticleCount)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
+
+			passEncoder.SetPipeline(missileRenderPipeline)
+			vertexBuffers.Bind(passEncoder)
+			passEncoder.Draw(9, opt.V(wasmgpu.GPUSize32(maxParticleCount)), opt.Unspecified[wasmgpu.GPUSize32](), opt.Unspecified[wasmgpu.GPUSize32]())
+
 			passEncoder.End()
 		}
 
