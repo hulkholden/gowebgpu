@@ -16,6 +16,13 @@
 <body>
     <h1>Go / WASM / WebGPU Demo</h1>
 
+    <div style="margin:10px 0;">
+        <label for="example-select">Example:</label>
+        <select id="example-select" onchange="window.location.search='?example='+this.value">
+            {{range .ExampleNames}}<option value="{{.}}"{{if eq $.Example .}} selected{{end}}>{{.}}</option>
+            {{end}}</select>
+    </div>
+
     <div id="error" style="display:none; color:#ff4444; background:#1a0000; border:1px solid #ff4444; padding:10px; margin:10px 0; font-family:monospace;"></div>
 
     <canvas id="display" width="1000" height="800" style="display:inline-block; background-color:#000;"></canvas>

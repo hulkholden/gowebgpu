@@ -34,6 +34,21 @@ async function init() {
   window.getContext = () => {
     return context;
   };
+  window.getExample = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("example") || "battle";
+  };
 }
+
+// Expose showError to Go/WASM so it can display errors in the UI.
+window.showError = showError;
+
+// Capture unhandled errors (e.g. WASM panics).
+window.addEventListener("error", (e) => {
+  showError("Error: " + e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  showError("Error: " + (e.reason?.message || e.reason));
+});
 
 init().catch((e) => showError("Init error: " + e.message));

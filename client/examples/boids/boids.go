@@ -65,12 +65,12 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 		0.01 * boidScale, -0.02 * boidScale,
 		0.0 * boidScale, 0.02 * boidScale,
 	}
-	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData)
+	spriteVertexBuffer := engine.InitStorageBufferSlice(device, vertexBufferData, engine.WithVertexUsage())
 
 	initialParticleData := initParticleData(numParticles)
-	particleBuffers := []engine.StorageBuffer{
-		engine.InitStorageBufferSlice(device, initialParticleData),
-		engine.InitStorageBufferSlice(device, initialParticleData),
+	particleBuffers := []engine.GPUBuffer[Particle]{
+		engine.InitStorageBufferSlice(device, initialParticleData, engine.WithVertexUsage()),
+		engine.InitStorageBufferSlice(device, initialParticleData, engine.WithVertexUsage()),
 	}
 
 	// TODO: Figure out a nice way to retreive these from VertexBuffers.
@@ -132,11 +132,11 @@ func Run(device wasmgpu.GPUDevice, context wasmgpu.GPUCanvasContext) error {
 	for i := 0; i < 2; i++ {
 		particleBindGroups[i] = device.CreateBindGroup(wasmgpu.GPUBindGroupDescriptor{
 			Layout: computePipeline.GetBindGroupLayout(0),
-			Entries: engine.MakeGPUBindingGroupEntries(
-				wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].Buffer()},
-				wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].Buffer()},
-			),
+			Entries: []wasmgpu.GPUBindGroupEntry{
+				{Binding: 0, Resource: wasmgpu.GPUBufferBinding{Buffer: simParamBuffer.Buffer()}},
+				{Binding: 1, Resource: wasmgpu.GPUBufferBinding{Buffer: particleBuffers[i].Buffer()}},
+				{Binding: 2, Resource: wasmgpu.GPUBufferBinding{Buffer: particleBuffers[(i+1)%2].Buffer()}},
+			},
 		})
 	}
 
