@@ -36,7 +36,7 @@ async function init() {
   };
   window.getExample = () => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("example") || "battle";
+    return params.get("example");
   };
 }
 

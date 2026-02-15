@@ -39,10 +39,14 @@ func main() {
 	context := wasmgpu.NewCanvasContext(jsContext)
 	device := wasmgpu.NewDevice(jsDevice)
 
-	example := js.Global().Call("getExample").String()
+	const defaultExample = "battle"
+	example := defaultExample
+	if jsExample := js.Global().Call("getExample"); !jsExample.IsNull() {
+		example = jsExample.String()
+	}
 	run, ok := examples[example]
 	if !ok {
-		run = examples["battle"]
+		run = examples[defaultExample]
 	}
 	err := run(device, context)
 	if err != nil {
