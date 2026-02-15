@@ -1,11 +1,21 @@
+function showError(msg) {
+  const el = document.getElementById("error");
+  if (el) {
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+}
+
 async function init() {
   if (!navigator.gpu) {
-    throw Error("WebGPU not supported.");
+    showError("WebGPU not supported in this browser.");
+    return;
   }
 
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) {
-    throw Error("Couldn't request WebGPU adapter.");
+    showError("Couldn't request WebGPU adapter.");
+    return;
   }
   const device = await adapter.requestDevice();
 
@@ -26,4 +36,4 @@ async function init() {
   };
 }
 
-init();
+init().catch((e) => showError("Init error: " + e.message));
