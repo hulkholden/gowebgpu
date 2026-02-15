@@ -2,13 +2,13 @@ timeout: '600s'
 
 steps:
 - id: 'Bazel build'
-  name: 'gcr.io/cloud-builders/bazel:6.2.1'
+  name: 'gcr.io/bazel-public/bazel:9.0.0'
   args: ['build', '//:gowebgpu_tarball']
 
-- id: 'Create symlink'
-  name: 'gcr.io/cloud-builders/bazel:6.2.1'
+- id: 'Bazel cquery'
+  name: 'gcr.io/bazel-public/bazel:9.0.0'
   entrypoint: '/bin/bash'
-  args: 
+  args:
   - -ceux
   - |
     # Keep track of where the binary is located.

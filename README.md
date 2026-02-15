@@ -4,7 +4,7 @@ An experiment with Go + WASM + WebGPU
 ## Prerequisites
 
 - **Go 1.21+**
-- **Bazel 7.x** (via [Bazelisk](https://github.com/bazelbuild/bazelisk))
+- **Bazel 9.x** (via [Bazelisk](https://github.com/bazelbuild/bazelisk))
 - **gcc** (required by Bazel's CC toolchain)
 
 ## Local Testing
@@ -12,7 +12,7 @@ An experiment with Go + WASM + WebGPU
 Natively:
 
 ```bash
-bazel run :gowebgpu -- --port=9090
+bazel run :gowebgpu -- --port=9090 --tls
 ```
 
 With docker:
