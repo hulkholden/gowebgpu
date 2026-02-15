@@ -1,8 +1,17 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "math32",
     srcs = ["math32.go"],
     importpath = "github.com/hulkholden/gowebgpu/common/math32",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "math32_test",
+    srcs = ["math32_test.go"],
+    embed = [":math32"],
+    deps = [
+        "@com_github_google_go_cmp//cmp",
+    ],
 )

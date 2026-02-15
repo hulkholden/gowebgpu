@@ -114,7 +114,7 @@ type UniformRangedValue struct {
 }
 
 func (v UniformRangedValue) Get(r *rand.Rand) float32 {
-	return v.Min + (rand.Float32() * (v.Max - v.Min))
+	return v.Min + (r.Float32() * (v.Max - v.Min))
 }
 
 type NormallyDistributedValue struct {

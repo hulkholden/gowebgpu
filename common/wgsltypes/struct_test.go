@@ -1,6 +1,8 @@
 package wgsltypes
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -134,5 +136,169 @@ func TestToWGSL(t *testing.T) {
 `
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("diff mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRegisterStructRejectsNonStruct(t *testing.T) {
+	_, err := RegisterStruct[int]()
+	if err == nil {
+		t.Fatal("RegisterStruct[int]() succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "not a struct") {
+		t.Errorf("error = %q, want it to mention 'not a struct'", err)
+	}
+}
+
+type unsupportedFieldStruct struct {
+	val float64 // float64 is not mapped to any WGSL type
+}
+
+func TestRegisterStructRejectsUnsupportedType(t *testing.T) {
+	_, err := RegisterStruct[unsupportedFieldStruct]()
+	if err == nil {
+		t.Fatal("RegisterStruct[unsupportedFieldStruct]() succeeded, want error for float64 field")
+	}
+	if !strings.Contains(err.Error(), "unhandled type") {
+		t.Errorf("error = %q, want it to mention 'unhandled type'", err)
+	}
+}
+
+func TestValidateOffset(t *testing.T) {
+	tests := []struct {
+		name    string
+		offset  uintptr
+		alignOf int
+		wantErr bool
+	}{
+		{name: "aligned", offset: 16, alignOf: 16, wantErr: false},
+		{name: "zero offset", offset: 0, alignOf: 8, wantErr: false},
+		{name: "misaligned", offset: 5, alignOf: 4, wantErr: true},
+		{name: "misaligned vec3", offset: 4, alignOf: 16, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			field := reflect.StructField{
+				Name:   "testField",
+				Offset: tc.offset,
+			}
+			wgslType := Type{Name: "test", AlignOf: tc.alignOf, SizeOf: 4}
+			err := validateOffset(field, wgslType)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("validateOffset(offset=%d, align=%d) error = %v, wantErr = %v", tc.offset, tc.alignOf, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestMustOffsetOf(t *testing.T) {
+	s, err := RegisterStruct[testStruct]()
+	if err != nil {
+		t.Fatalf("RegisterStruct failed: %v", err)
+	}
+
+	// Known field should return its offset.
+	got := s.MustOffsetOf("f32Val")
+	if got != 40 {
+		t.Errorf("MustOffsetOf('f32Val') = %d, want 40", got)
+	}
+
+	got = s.MustOffsetOf("vec4")
+	if got != 0 {
+		t.Errorf("MustOffsetOf('vec4') = %d, want 0", got)
+	}
+}
+
+func TestMustOffsetOfPanicsOnUnknown(t *testing.T) {
+	s, err := RegisterStruct[testStruct]()
+	if err != nil {
+		t.Fatalf("RegisterStruct failed: %v", err)
+	}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("MustOffsetOf('nonexistent') did not panic")
+		}
+	}()
+	s.MustOffsetOf("nonexistent")
+}
+
+func TestMustRegisterStructPanicsOnError(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("MustRegisterStruct[int]() did not panic")
+		}
+	}()
+	MustRegisterStruct[int]()
+}
+
+func TestStructString(t *testing.T) {
+	s, err := RegisterStruct[testStruct]()
+	if err != nil {
+		t.Fatalf("RegisterStruct failed: %v", err)
+	}
+
+	str := s.String()
+	// Should contain the Go name and size.
+	if !strings.Contains(str, string(s.GoName)) {
+		t.Errorf("String() = %q, want it to contain GoName %q", str, s.GoName)
+	}
+	if !strings.Contains(str, "76") {
+		t.Errorf("String() = %q, want it to contain size '76'", str)
+	}
+	// Should mention field names.
+	if !strings.Contains(str, "vec4") {
+		t.Errorf("String() = %q, want it to contain field 'vec4'", str)
+	}
+}
+
+// simpleStruct is a minimal struct for testing basic registration.
+type simpleStruct struct {
+	x float32
+	y float32
+}
+
+func TestRegisterSimpleStruct(t *testing.T) {
+	s, err := RegisterStruct[simpleStruct]()
+	if err != nil {
+		t.Fatalf("RegisterStruct[simpleStruct]() = %v", err)
+	}
+	if s.Name != "simpleStruct" {
+		t.Errorf("Name = %q, want 'simpleStruct'", s.Name)
+	}
+	if len(s.Fields) != 2 {
+		t.Errorf("len(Fields) = %d, want 2", len(s.Fields))
+	}
+	if s.Size != 8 {
+		t.Errorf("Size = %d, want 8", s.Size)
+	}
+}
+
+// nestedInner is a struct that will be used as a field in another struct.
+type nestedInner struct {
+	a float32
+	b float32
+}
+
+type nestedOuter struct {
+	inner nestedInner
+}
+
+func TestRegisterNestedStruct(t *testing.T) {
+	// Register the inner struct first so it's in the registry.
+	_, err := RegisterStruct[nestedInner]()
+	if err != nil {
+		t.Fatalf("RegisterStruct[nestedInner]() = %v", err)
+	}
+
+	// Now register the outer struct which references the inner.
+	s, err := RegisterStruct[nestedOuter]()
+	if err != nil {
+		t.Fatalf("RegisterStruct[nestedOuter]() = %v", err)
+	}
+	innerField := s.FieldMap["inner"]
+	if innerField.WGSLType.Name != "nestedInner" {
+		t.Errorf("nested field WGSL type = %q, want 'nestedInner'", innerField.WGSLType.Name)
 	}
 }
