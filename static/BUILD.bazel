@@ -34,5 +34,5 @@ gzip_file(
 go_copy_sdk_file(
     name = "wasm_exec_js",
     out = "wasm_exec.js",
-    sdkfile = "misc/wasm/wasm_exec.js",
+    sdkfile = "lib/wasm/wasm_exec.js",
 )

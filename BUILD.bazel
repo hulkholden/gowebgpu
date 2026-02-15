@@ -1,6 +1,6 @@
 load("@gazelle//:def.bzl", "gazelle")
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 # gazelle:prefix github.com/hulkholden/gowebgpu
@@ -15,10 +15,16 @@ gazelle(
     command = "update-repos",
 )
 
-oci_tarball(
-    name = "gowebgpu_tarball",
+oci_load(
+    name = "gowebgpu_load",
     image = ":image",
     repo_tags = ["gowebgpu:latest"],
+)
+
+filegroup(
+    name = "gowebgpu_tarball",
+    srcs = [":gowebgpu_load"],
+    output_group = "tarball",
 )
 
 oci_image(
@@ -31,7 +37,7 @@ oci_image(
 pkg_tar(
     name = "gowebgpu_layer",
     srcs = [":gowebgpu_linux"],
-    # include_runfiles = True
+    extension = "tar.gz",
 )
 
 go_binary(

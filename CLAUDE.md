@@ -31,19 +31,19 @@ gowebgpu/
 
 ## Build System
 
-**Primary build system: Bazel** (with bzlmod enabled via `.bazelrc`).
+**Primary build system: Bazel 9** (bzlmod only, WORKSPACE support removed).
 
 ### Prerequisites
 
 - **Go 1.21+**
-- **Bazel 7.x** (via [Bazelisk](https://github.com/bazelbuild/bazelisk)) — pinned in `.bazelversion`
+- **Bazel 9.x** (via [Bazelisk](https://github.com/bazelbuild/bazelisk)) — pinned in `.bazelversion`
 - **gcc** (required by Bazel's CC toolchain)
 
 ### Key Commands
 
 ```bash
-# Run the server natively (opens on port 9090)
-bazel run :gowebgpu -- --port=9090
+# Run the server natively (opens on port 9090 with self-signed HTTPS)
+bazel run :gowebgpu -- --port=9090 --tls
 
 # Build all targets
 bazel build //...
@@ -96,7 +96,7 @@ The `go.mod` contains a `replace` directive pointing `mokiat/wasmgpu` to a custo
 - Tests use Go's standard `testing` package with `go-cmp` for diff assertions.
 - Test files live alongside source files (e.g., `struct_test.go` next to `struct.go`).
 - Run tests via `bazel test //...` (not `go test`).
-- Currently, tests exist only in `common/wgsltypes/`.
+- Currently, tests exist in `common/math32/`, `common/vmath/`, and `common/wgsltypes/`.
 
 ## Code Conventions
 
