@@ -12,6 +12,7 @@ go_library(
     name = "client_lib",
     srcs = ["main.go"],
     importpath = "github.com/hulkholden/gowebgpu/client",
+    tags = ["manual"],
     visibility = ["//visibility:private"],
     deps = [
         "//client/examples/battle",

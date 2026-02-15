@@ -45,10 +45,8 @@ gowebgpu/
 # Run the server natively (opens on port 9090)
 bazel run :gowebgpu -- --port=9090
 
-# Build all targets explicitly
-# Note: `bazel build //...` fails because it includes WASM-only library targets
-# (e.g. //client:client_lib) which can't compile for the host platform.
-bazel build //:gowebgpu //client //:gowebgpu_linux //static //common/...
+# Build all targets
+bazel build //...
 
 # Run all tests
 bazel test //...
